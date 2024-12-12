@@ -1,0 +1,76 @@
+{
+  "inputs": {
+    "src/index.ts": {
+      "bytes": 50032,
+      "imports": [],
+      "format": "esm"
+    }
+  },
+  "outputs": {
+    "dist/index.js.map": {
+      "imports": [],
+      "exports": [],
+      "inputs": {},
+      "bytes": 77292
+    },
+    "dist/index.js": {
+      "imports": [
+        {
+          "path": "bencode",
+          "kind": "import-statement",
+          "external": true
+        },
+        {
+          "path": "bitfield",
+          "kind": "import-statement",
+          "external": true
+        },
+        {
+          "path": "@bicycle-codes/one-webcrypto",
+          "kind": "import-statement",
+          "external": true
+        },
+        {
+          "path": "rc4",
+          "kind": "import-statement",
+          "external": true
+        },
+        {
+          "path": "streamx",
+          "kind": "import-statement",
+          "external": true
+        },
+        {
+          "path": "@substrate-system/uint8-util",
+          "kind": "import-statement",
+          "external": true
+        },
+        {
+          "path": "throughput",
+          "kind": "import-statement",
+          "external": true
+        },
+        {
+          "path": "unordered-array-remove",
+          "kind": "import-statement",
+          "external": true
+        },
+        {
+          "path": "@substrate-system/debug",
+          "kind": "import-statement",
+          "external": true
+        }
+      ],
+      "exports": [
+        "default"
+      ],
+      "entryPoint": "src/index.ts",
+      "inputs": {
+        "src/index.ts": {
+          "bytesInOutput": 39422
+        }
+      },
+      "bytes": 39622
+    }
+  }
+}

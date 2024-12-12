@@ -1,17 +1,38 @@
 {
-  "name": "bittorrent-protocol",
+  "name": "@substrate-system/bittorrent-protocol",
   "type": "module",
   "description": "Simple, robust, BitTorrent peer wire protocol implementation",
   "version": "4.1.16",
-  "author": {
-    "name": "WebTorrent LLC",
-    "email": "feross@webtorrent.io",
-    "url": "https://webtorrent.io"
+  "files": [
+    "./dist/*"
+  ],
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
   },
-  "bugs": {
-    "url": "https://github.com/webtorrent/bittorrent-protocol/issues"
+  "scripts": {
+    "lint": "eslint \"./**/*.{ts,js}\"",
+    "build-tests": "esbuild test/index.ts --target=es2020 --bundle --keep-names > test/test-bundle.js",
+    "test": "npm run build && npm run build-tests && node ./test/test-bundle.js",
+    "build-cjs": "esbuild src/*.ts --format=cjs --keep-names --tsconfig=tsconfig.build.json --outdir=./dist --out-extension:.js=.cjs --sourcemap",
+    "build-cjs:min": "esbuild src/*.ts --format=cjs --minify --keep-names --tsconfig=tsconfig.build.json --outdir=./dist --out-extension:.js=.min.cjs --sourcemap",
+    "build-esm": "esbuild src/*.ts --format=esm --metafile=dist/meta.json --keep-names --tsconfig=tsconfig.build.json --outdir=./dist --sourcemap && tsc --emitDeclarationOnly --project tsconfig.build.json --outDir dist",
+    "build-esm:min": "esbuild ./src/*.ts --format=esm --keep-names --bundle --tsconfig=tsconfig.build.json --minify --out-extension:.js=.min.js --outdir=./dist --sourcemap",
+    "build-example": "mkdir -p ./public && rm -rf ./public/* && VITE_DEBUG_MODE=staging vite --mode staging --base=\"/repo-name\" build",
+    "build-docs": "typedoc ./src/index.ts",
+    "build": "mkdir -p ./dist && rm -rf ./dist/* && npm run build-cjs && npm run build-esm && npm run build-esm:min && npm run build-cjs:min",
+    "start": "vite",
+    "toc": "markdown-toc --maxdepth 3 -i README.md",
+    "preversion": "npm run lint",
+    "version": "npm run toc && auto-changelog -p --template keepachangelog --breaking-pattern 'BREAKING CHANGE:' && git add CHANGELOG.md README.md",
+    "postversion": "git push --follow-tags && npm publish",
+    "prepublishOnly": "npm run build"
   },
   "dependencies": {
+    "@bicycle-codes/one-webcrypto": "^1.1.2",
+    "@substrate-system/uint8-util": "^2.2.21",
     "bencode": "^4.0.0",
     "bitfield": "^4.1.0",
     "debug": "^4.4.0",
@@ -22,17 +43,35 @@
     "unordered-array-remove": "^1.0.2"
   },
   "devDependencies": {
-    "@webtorrent/semantic-release-config": "1.0.10",
-    "semantic-release": "21.1.2",
-    "standard": "*",
+    "@substrate-system/debug": "^0.7.2",
+    "@substrate-system/tapzero": "^0.10.5",
+    "@types/streamx": "^2.9.5",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "auto-changelog": "^2.4.0",
+    "esbuild": "^0.24.0",
+    "eslint": "^8.57.0",
+    "eslint-config-standard": "^17.1.0",
+    "markdown-toc": "^1.2.0",
+    "postcss-nesting": "^13.0.0",
     "tap-spec": "^5.0.0",
-    "tape": "5.9.0"
+    "typedoc": "^0.27.0",
+    "typescript": "^5.4.5"
   },
-  "engines": {
-    "node": ">=12.20.0"
+  "contributors": [
+    {
+      "name": "Nick Thomas",
+      "email": "nichoth@nichoth.com",
+      "url": "https://nichoth.com/"
+    }
+  ],
+  "author": {
+    "name": "WebTorrent LLC",
+    "email": "feross@webtorrent.io",
+    "url": "https://webtorrent.io"
   },
-  "exports": {
-    "import": "./index.js"
+  "bugs": {
+    "url": "https://github.com/substrate-system/bittorrent-protocol/issues"
   },
   "keywords": [
     "bittorrent",
@@ -47,32 +86,6 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git://github.com/webtorrent/bittorrent-protocol.git"
-  },
-  "scripts": {
-    "test": "standard && tape test/*.js | tap-spec"
-  },
-  "funding": [
-    {
-      "type": "github",
-      "url": "https://github.com/sponsors/feross"
-    },
-    {
-      "type": "patreon",
-      "url": "https://www.patreon.com/feross"
-    },
-    {
-      "type": "consulting",
-      "url": "https://feross.org/support"
-    }
-  ],
-  "renovate": {
-    "extends": [
-      "github>webtorrent/renovate-config"
-    ],
-    "rangeStrategy": "bump"
-  },
-  "release": {
-    "extends": "@webtorrent/semantic-release-config"
+    "url": "git://github.com/substrate-system/bittorrent-protocol.git"
   }
 }
