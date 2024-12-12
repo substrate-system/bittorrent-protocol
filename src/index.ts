@@ -3,7 +3,7 @@ import bencode from 'bencode'
 import BitField from 'bitfield'
 import { webcrypto } from '@bicycle-codes/one-webcrypto'
 import RC4 from 'rc4'
-import { Duplex } from 'streamx'
+import { Duplex, type StreamEvents } from 'streamx'
 import {
     hash,
     concat,
@@ -14,7 +14,7 @@ import {
     arr2text,
     randomBytes
 } from '@substrate-system/uint8-util'
-import throughput from 'throughput'
+import throughput from '@substrate-system/throughput'
 import arrayRemove from 'unordered-array-remove'
 import Debug from '@substrate-system/debug'
 const debug = Debug('bittorrent-protocol')
@@ -43,11 +43,6 @@ const VC = new Uint8Array([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
 const CRYPTO_PROVIDE = new Uint8Array([0x00, 0x00, 0x01, 0x02])
 const CRYPTO_SELECT = new Uint8Array([0x00, 0x00, 0x00, 0x02]) // always try to choose RC4 encryption instead of plaintext
 
-function xor (a, b) {
-    for (let len = a.length; len--;) a[len] ^= b[len]
-    return a
-}
-
 class Request {
     piece
     offset
@@ -66,7 +61,7 @@ class HaveAllBitField {
     buffer:Uint8Array
 
     constructor () {
-        this.buffer = new Uint8Array() // dummy
+        this.buffer = new Uint8Array()  // dummy
     }
 
     get (_index?:number) {
@@ -127,6 +122,26 @@ class HaveAllBitField {
 //     this._myPubKey = null
 // }
 
+type ProtocolEvents = StreamEvents & {
+    'upload':()=>void;
+    'new-item':(item:string) => void;
+    'item-updated':(item:string, newValue:number) => void;
+    'finish':(item:any)=>void
+}
+
+// interface ProtocolEvents extends Events {
+//     'upload':()=>void;
+//     'new-item': (item: string) => void;
+//     'item-updated': (item: string, newValue: number) => void;
+// }
+
+interface Ext {
+    (any):any
+    onMessage:(any)=>any
+    onHandshake:(arg:any, arg2:any, arg3:any)=>any
+    onExtendedHandshake
+}
+
 class Wire extends Duplex {
     _debugId:string
     peerId:null|string
@@ -147,7 +162,7 @@ class Wire extends Duplex {
     _cryptoHandshakeDone:boolean
     _peerCryptoProvide  // encryption methods provided by peer; we expect this
     //                     to always contain 0x02
-    peerPieces:InstanceType<typeof BitField>
+    peerPieces:InstanceType<typeof BitField>|InstanceType<typeof HaveAllBitField>
     extensions:Record<string, any>
     peerExtensions:Record<string, any>
     requests:any[]  // outgoing
@@ -163,12 +178,12 @@ class Wire extends Duplex {
     allowedFastSet  // allowed fast set
     peerAllowedFastSet  // peer's allowed fast set
     // string -> function, ex 'ut_metadata' -> ut_metadata()
-    _ext:Record<string, (any)=>any>
+    _ext:Record<string, Ext>
     _nextExt:number
     uploaded:number
     downloaded:number
-    uploadSpeed:number
-    downloadSpeed:number
+    uploadSpeed:(delta:number)=>number
+    downloadSpeed:(delta:number)=>number
 
     _keepAliveInterval
     _timeout
@@ -186,6 +201,9 @@ class Wire extends Duplex {
     // the pattern to search for when resynchronizing after receiving pe1/pe2
     _cryptoSyncPattern
     _encryptionMethod:null|1|2  // 1 for plaintext, 2 for RC4
+    _infoHash?:Uint8Array
+    _handshakeSent?:boolean
+    _extendedHandshakeSent?:boolean
 
     constructor (
         dhKeys:{ keys:CryptoKeyPair, hex:string, spki:ArrayBuffer },
@@ -286,7 +304,7 @@ class Wire extends Duplex {
         } else if (this.type === 'tcpOutgoing' && this._peEnabled && retries === 0) {
             this._parsePe2()
         } else {
-            this._parseHandshake(null)
+            this._parseHandshake()
         }
     }
 
@@ -298,6 +316,14 @@ class Wire extends Duplex {
         const dhKeys = await createDhKeypair()
         const wire = new Wire(dhKeys, type, retries, peEnabled)
         return wire
+    }
+
+    on<K extends keyof ProtocolEvents> (ev:K, listener:ProtocolEvents[K]):this {
+        if (ev !== 'upload' && ev !== 'new-item' && ev !== 'item-updated') {
+            return super.on(ev, listener)
+        }
+
+        return this
     }
 
     /**
@@ -389,14 +415,14 @@ class Wire extends Duplex {
         if (this._peEnabled) {
             const padALen = Math.floor(Math.random() * 513)
             const padA = randomBytes(padALen)
-            this._push(concat([hex2arr(this._myPubKey), padA]))
+            this._push(concat([hex2arr(this._myPubKey as string), padA]))
         }
     }
 
     sendPe2 () {
         const padBLen = Math.floor(Math.random() * 513)
         const padB = randomBytes(padBLen)
-        this._push(concat([hex2arr(this._myPubKey), padB]))
+        this._push(concat([hex2arr(this._myPubKey as string), padB]))
     }
 
     async sendPe3 (infoHash) {
@@ -444,13 +470,18 @@ class Wire extends Duplex {
     }
 
     /**
-   * Message: "handshake" <pstrlen><pstr><reserved><info_hash><peer_id>
-   * @param  {Uint8Array|string} infoHash (as Buffer or *hex* string)
-   * @param  {Uint8Array|string} peerId
-   * @param  {Object} extensions
-   */
-    handshake (infoHash, peerId, extensions) {
-        let infoHashBuffer
+     * Message: "handshake" <pstrlen><pstr><reserved><info_hash><peer_id>
+     *
+     * @param  {Uint8Array|string} infoHash (as Buffer or *hex* string)
+     * @param  {Uint8Array|string} peerId
+     * @param  {Object} extensions
+     */
+    handshake (
+        infoHash:Uint8Array|string,
+        peerId:Uint8Array|string,
+        extensions?:any
+    ) {
+        let infoHashBuffer:Uint8Array
         let peerIdBuffer
         if (typeof infoHash === 'string') {
             infoHash = infoHash.toLowerCase()
@@ -502,14 +533,14 @@ class Wire extends Duplex {
     }
 
     /* Peer supports BEP-0010, send extended handshake.
-   *
-   * This comes after the 'handshake' event to give the user a chance to populate
-   * `this.extendedHandshake` and `this.extendedMapping` before the extended handshake
-   * is sent to the remote peer.
-   */
+     *
+     * This comes after the 'handshake' event to give the user a chance to populate
+     * `this.extendedHandshake` and `this.extendedMapping` before the extended handshake
+     * is sent to the remote peer.
+     */
     _sendExtendedHandshake () {
-    // Create extended message object from registered extensions
-        const msg = Object.assign({}, this.extendedHandshake)
+        // Create extended message object from registered extensions
+        const msg:{ m?:{ name?:number } } = Object.assign({}, this.extendedHandshake)
         msg.m = {}
         for (const ext in this.extendedMapping) {
             const name = this.extendedMapping[ext]
@@ -623,16 +654,17 @@ class Wire extends Duplex {
     }
 
     /**
-   * Message "piece": <len=0009+X><id=7><index><begin><block>
-   * @param  {number} index
-   * @param  {number} offset
-   * @param  {Uint8Array} buffer
-   */
-    piece (index, offset, buffer) {
+     * Message "piece": <len=0009+X><id=7><index><begin><block>
+     * @param  {number} index
+     * @param  {number} offset
+     * @param  {Uint8Array} buffer
+     */
+    piece (index:number, offset:number, buffer:Uint8Array) {
         this._debug('piece index=%d offset=%d', index, offset)
         this._message(7, [index, offset], buffer)
         this.uploaded += buffer.length
         this.uploadSpeed(buffer.length)
+        // @ts-expect-error How to extend the events?
         this.emit('upload', buffer.length)
     }
 
@@ -706,9 +738,9 @@ class Wire extends Duplex {
     }
 
     /**
-   * Message: "allowed-fast" <len=0x0005><id=0x11><piece index> (BEP6)
-   * @param {number} index
-   */
+     * Message: "allowed-fast" <len=0x0005><id=0x11><piece index> (BEP6)
+     * @param {number} index
+     */
     allowedFast (index) {
         if (!this.hasFast) throw Error('fast extension is disabled')
         this._debug('allowed-fast %d', index)
@@ -717,11 +749,11 @@ class Wire extends Duplex {
     }
 
     /**
-   * Message: "extended" <len=0005+X><id=20><ext-number><payload>
-   * @param  {number|string} ext
-   * @param  {Object} obj
-   */
-    extended (ext, obj) {
+     * Message: "extended" <len=0005+X><id=20><ext-number><payload>
+     * @param  {number|string} ext
+     * @param  {Object} obj
+     */
+    extended (ext:number, obj) {
         this._debug('extended ext=%s', ext)
         if (typeof ext === 'string' && this.peerExtendedMapping[ext]) {
             ext = this.peerExtendedMapping[ext]
@@ -824,25 +856,38 @@ class Wire extends Duplex {
 
     _onKeepAlive () {
         this._debug('got keep-alive')
+        // @ts-expect-error how to extend events?
         this.emit('keep-alive')
     }
 
-    _onPe1 (pubKeyBuffer) {
+    async _onPe1 (pubKeyBuffer) {
         this._peerPubKey = arr2hex(pubKeyBuffer)
         // this._sharedSecret = this._dh.computeSecret(this._peerPubKey, 'hex', 'hex')
-        this._sharedSecret = computeSharedSecret()
+        const secret = await computeSharedSecret(
+            this._dhKeys.keys.privateKey,
+            this._peerPubKey
+        )
+        this._sharedSecret = arr2hex(new Uint8Array(secret))
+        // @ts-expect-error @TDOD extend events
         this.emit('pe1')
     }
 
-    _onPe2 (pubKeyBuffer) {
+    async _onPe2 (pubKeyBuffer) {
         this._peerPubKey = arr2hex(pubKeyBuffer)
-        this._sharedSecret = this._dh.computeSecret(this._peerPubKey, 'hex', 'hex')
+        const secret = await computeSharedSecret(
+            this._dhKeys.keys.privateKey,
+            this._peerPubKey
+        )
+        this._sharedSecret = arr2hex(new Uint8Array(secret))
+        // this._sharedSecret = this._dh.computeSecret(this._peerPubKey, 'hex', 'hex')
+        // @ts-expect-error @TDOD extend events
         this.emit('pe2')
     }
 
-    async _onPe3 (hashesXorBuffer) {
-        const hash3 = await (arr2hex(this._utfToHex('req3') + this._sharedSecret))
+    async _onPe3 (hashesXorBuffer:Uint8Array) {
+        const hash3 = hex2arr(this._utfToHex('req3') + this._sharedSecret)
         const sKeyHash = arr2hex(xor(hash3, hashesXorBuffer))
+        // @ts-expect-error @TDOD extend events
         this.emit('pe3', sKeyHash)
     }
 
@@ -866,14 +911,15 @@ class Wire extends Duplex {
         }
     }
 
-    _onPe4 (peerSelectBuffer) {
-        this._encryptionMethod = peerSelectBuffer[3]
-        if (!CRYPTO_PROVIDE.includes(this._encryptionMethod)) {
+    _onPe4 (peerSelectBuffer:Uint8Array) {
+        this._encryptionMethod = peerSelectBuffer[3] as 1|2|null
+        if (!CRYPTO_PROVIDE.includes(this._encryptionMethod as number)) {
             this._debug('Error: peer selected invalid crypto method')
             this.destroy()
         }
         this._cryptoHandshakeDone = true
         this._debug('crypto handshake done')
+        // @ts-expect-error @TDOD events + types
         this.emit('pe4')
     }
 
@@ -893,6 +939,7 @@ class Wire extends Duplex {
             this.hasFast = true
         }
 
+        // @ts-expect-error @TDOD events + types
         this.emit('handshake', infoHash, peerId, extensions)
 
         for (const name in this._ext) {
@@ -909,6 +956,7 @@ class Wire extends Duplex {
     _onChoke () {
         this.peerChoking = true
         this._debug('got choke')
+        // @ts-expect-error @TDOD events + types
         this.emit('choke')
         if (!this.hasFast) {
             // BEP6 Fast Extension: Choke no longer implicitly rejects all pending requests
@@ -921,18 +969,21 @@ class Wire extends Duplex {
     _onUnchoke () {
         this.peerChoking = false
         this._debug('got unchoke')
+        // @ts-expect-error @TDOD events + types
         this.emit('unchoke')
     }
 
     _onInterested () {
         this.peerInterested = true
         this._debug('got interested')
+        // @ts-expect-error @TDOD events + types
         this.emit('interested')
     }
 
     _onUninterested () {
         this.peerInterested = false
         this._debug('got uninterested')
+        // @ts-expect-error @TDOD events + types
         this.emit('uninterested')
     }
 
@@ -941,12 +992,14 @@ class Wire extends Duplex {
         this._debug('got have %d', index)
 
         this.peerPieces.set(index, true)
+        // @ts-expect-error @TDOD events + types
         this.emit('have', index)
     }
 
     _onBitField (buffer) {
         this.peerPieces = new BitField(buffer)
         this._debug('got bitfield')
+        // @ts-expect-error @TDOD events + types
         this.emit('bitfield', this.peerPieces)
     }
 
@@ -971,6 +1024,7 @@ class Wire extends Duplex {
 
         const request = new Request(index, offset, length, respond)
         this.peerRequests.push(request)
+        // @ts-expect-error @TDOD events + types
         this.emit('request', index, offset, length, respond)
     }
 
@@ -979,18 +1033,22 @@ class Wire extends Duplex {
         this._callback(this._pull(this.requests, index, offset, buffer.length), null, buffer)
         this.downloaded += buffer.length
         this.downloadSpeed(buffer.length)
+        // @ts-expect-error @TDOD events + types
         this.emit('download', buffer.length)
+        // @ts-expect-error @TDOD events + types
         this.emit('piece', index, offset, buffer)
     }
 
     _onCancel (index, offset, length) {
         this._debug('got cancel index=%d offset=%d length=%d', index, offset, length)
         this._pull(this.peerRequests, index, offset, length)
+        // @ts-expect-error @TDOD events + types
         this.emit('cancel', index, offset, length)
     }
 
     _onPort (port) {
         this._debug('got port %d', port)
+        // @ts-expect-error @TDOD events + types
         this.emit('port', port)
     }
 
@@ -1002,6 +1060,7 @@ class Wire extends Duplex {
             return
         }
         this._debug('got suggest %d', index)
+        // @ts-expect-error @TDOD events + types
         this.emit('suggest', index)
     }
 
@@ -1014,6 +1073,7 @@ class Wire extends Duplex {
         }
         this._debug('got have-all')
         this.peerPieces = new HaveAllBitField()
+        // @ts-expect-error @TDOD events + types
         this.emit('have-all')
     }
 
@@ -1025,6 +1085,7 @@ class Wire extends Duplex {
             return
         }
         this._debug('got have-none')
+        // @ts-expect-error @TDOD events + types
         this.emit('have-none')
     }
 
@@ -1041,10 +1102,11 @@ class Wire extends Duplex {
             new Error('request was rejected'),
             null
         )
+        // @ts-expect-error @TDOD events + types
         this.emit('reject', index, offset, length)
     }
 
-    _onAllowedFast (index) {
+    _onAllowedFast (index:number):void {
         if (!this.hasFast) {
             // BEP6: the peer MUST close the connection
             this._debug('Error: got allowed-fast whereas fast extension is disabled')
@@ -1052,18 +1114,29 @@ class Wire extends Duplex {
             return
         }
         this._debug('got allowed-fast %d', index)
-        if (!this.peerAllowedFastSet.includes(index)) this.peerAllowedFastSet.push(index)
-        if (this.peerAllowedFastSet.length > ALLOWED_FAST_SET_MAX_LENGTH) this.peerAllowedFastSet.shift()
+
+        if (!this.peerAllowedFastSet.includes(index)) {
+            this.peerAllowedFastSet.push(index)
+        }
+        if (this.peerAllowedFastSet.length > ALLOWED_FAST_SET_MAX_LENGTH) {
+            this.peerAllowedFastSet.shift()
+        }
+
+        // @ts-expect-error @TDOD events + types
         this.emit('allowed-fast', index)
     }
 
-    _onExtended (ext, buf) {
+    _onExtended (ext:number|string, buf:Uint8Array) {
         if (ext === 0) {
             let info
             try {
                 info = bencode.decode(buf)
-            } catch (err) {
-                this._debug('ignoring invalid extended handshake: %s', err.message || err)
+            } catch (_err) {
+                const err = _err as Error
+                this._debug(
+                    'ignoring invalid extended handshake: %s',
+                    err.message || err
+                )
             }
 
             if (!info) return
@@ -1076,10 +1149,13 @@ class Wire extends Duplex {
             }
             for (const name in this._ext) {
                 if (this.peerExtendedMapping[name]) {
-                    this._ext[name].onExtendedHandshake(this.peerExtendedHandshake)
+                    this._ext[name].onExtendedHandshake(
+                        this.peerExtendedHandshake
+                    )
                 }
             }
             this._debug('got extended handshake')
+            // @ts-expect-error @TDOD events + types
             this.emit('extended', 'handshake', this.peerExtendedHandshake)
         } else {
             if (this.extendedMapping[ext]) {
@@ -1090,6 +1166,7 @@ class Wire extends Duplex {
                 }
             }
             this._debug('got extended message ext=%s', ext)
+            // @ts-expect-error @TODO extend events
             this.emit('extended', ext, buf)
         }
     }
@@ -1097,6 +1174,7 @@ class Wire extends Duplex {
     _onTimeout () {
         this._debug('request timed out')
         this._callback(this.requests.shift(), new Error('request has timed out'), null)
+        // @ts-expect-error @TODO extend events
         this.emit('timeout')
     }
 
@@ -1270,6 +1348,7 @@ class Wire extends Duplex {
                 return this._onExtended(buffer[1], buffer.slice(2))
             default:
                 this._debug('got unknown message')
+                // @ts-expect-error @TODO extend events
                 return this.emit('unknownmessage', buffer)
         }
     }
@@ -1487,7 +1566,7 @@ class Wire extends Duplex {
         return decrypt
     }
 
-    _utfToHex (str) {
+    _utfToHex (str:string):string {
         return arr2hex(text2arr(str))
     }
 }
@@ -1516,24 +1595,14 @@ export default Wire
 // }
 
 // Generate Alice's key pair
-const aliceKeyPair = await crypto.subtle.generateKey(
-    {
-        name: 'ECDH',
-        namedCurve: 'P-256'
-    },
-    true,
-    ['deriveKey', 'deriveBits']
-)
-
-// Generate Bob's key pair
-const bobKeyPair = await window.crypto.subtle.generateKey(
-    {
-        name: 'ECDH',
-        namedCurve: 'P-256'
-    },
-    true,
-    ['deriveKey', 'deriveBits']
-)
+// const aliceKeyPair = await crypto.subtle.generateKey(
+//     {
+//         name: 'ECDH',
+//         namedCurve: 'P-256'
+//     },
+//     true,
+//     ['deriveKey', 'deriveBits']
+// )
 
 async function computeSharedSecret (
     privKey:CryptoKey,
@@ -1554,8 +1623,8 @@ async function computeSharedSecret (
             public: publicKey
             // public: await webcrypto.subtle.exportKey('spki', bobKeyPair.publicKey)
         },
-        aliceKeyPair.privateKey,
-        256 // The desired length of the shared secret in bits
+        privKey,
+        256  // The desired length of the shared secret in bits
     )
 
     return sharedSecret
@@ -1593,4 +1662,11 @@ async function createDhKeypair ():Promise<{
     const hex = arr2hex(new Uint8Array(publicKey))
 
     return { keys, hex, spki: publicKey }
+}
+
+function xor (a:Uint8Array, b:Uint8Array):Uint8Array {
+    for (let len = a.length; len--;) {
+        a[len] ^= b[len]
+    }
+    return a
 }
