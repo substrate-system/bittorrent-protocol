@@ -25,27 +25,32 @@ test('Extension.prototype.name', async t => {
 test('Extension.onHandshake', async t => {
     t.plan(4)
 
-    const TestExtension = noop
-    TestExtension.prototype.name = 'test_extension'
-    TestExtension.prototype.onHandshake = (infoHash, peerId) => {
-        t.equal(Buffer.from(infoHash, 'hex').length, 20)
-        t.equal(Buffer.from(infoHash, 'hex').toString(), '01234567890123456789')
-        t.equal(Buffer.from(peerId, 'hex').length, 20)
-        t.equal(Buffer.from(peerId, 'hex').toString(), '12345678901234567890')
-    }
+    return new Promise<void>((resolve) => {
+        const TestExtension = noop
+        TestExtension.prototype.name = 'test_extension'
+        TestExtension.prototype.onHandshake = (infoHash, peerId) => {
+            t.equal(Buffer.from(infoHash, 'hex').length, 20)
+            t.equal(Buffer.from(infoHash, 'hex').toString(), '01234567890123456789')
+            t.equal(Buffer.from(peerId, 'hex').length, 20)
+            t.equal(Buffer.from(peerId, 'hex').toString(), '12345678901234567890')
+            resolve()
+        }
 
-    const wire = await Protocol.create()
-    wire.on('error', err => {
-        t.fail('' + err)
+        (async () => {
+            const wire = await Protocol.create()
+            wire.on('error', err => {
+                t.fail('' + err)
+            })
+            wire.pipe(wire)
+
+            wire.use(TestExtension)
+
+            wire.handshake(
+                Buffer.from('01234567890123456789'),
+                Buffer.from('12345678901234567890')
+            )
+        })()
     })
-    wire.pipe(wire)
-
-    wire.use(TestExtension)
-
-    wire.handshake(
-        Buffer.from('01234567890123456789'),
-        Buffer.from('12345678901234567890')
-    )
 })
 
 test('Extension.onExtendedHandshake', async t => {

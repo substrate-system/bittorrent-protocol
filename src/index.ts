@@ -1715,7 +1715,7 @@ async function createDhKeypair ():Promise<{
     hex:string;
     spki:ArrayBuffer;
 }> {
-    const keys = await window.crypto.subtle.generateKey({
+    const keys = await webcrypto.subtle.generateKey({
         name: 'ECDH',
         namedCurve: 'P-256',
     }, true, ['deriveKey'])
