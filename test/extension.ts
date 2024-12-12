@@ -73,6 +73,7 @@ test('Extension.onExtendedHandshake', async t => {
     })
     wire.pipe(wire)
 
+    // @ts-expect-error events???
     wire.once('handshake', (_infoHash, _peerId, extensions) => {
         t.equal(extensions.extended, true)
     })
@@ -85,29 +86,35 @@ test('Extension.onExtendedHandshake', async t => {
     )
 })
 
-test('Extension.onMessage', t => {
+test('Extension.onMessage', async t => {
     t.plan(1)
 
     class TestExtension {
+        wire
+        name = 'test_extension'
+
         constructor (wire) {
             this.wire = wire
         }
 
         onMessage (message) {
-            t.equal(Buffer.from(message).toString(), 'hello world!', 'receives message sent with wire.extended()')
+            t.equal(Buffer.from(message).toString(), 'hello world!',
+                'receives message sent with wire.extended()')
         }
     }
 
-    TestExtension.prototype.name = 'test_extension'
-
-    const wire = new Protocol() // outgoing
+    const wire = await Protocol.create()  // outgoing
     wire.on('error', err => { t.fail(err) })
     wire.pipe(wire)
 
     wire.use(TestExtension)
 
-    wire.handshake('3031323334353637383930313233343536373839', '3132333435363738393031323334353637383930')
+    wire.handshake(
+        '3031323334353637383930313233343536373839',
+        '3132333435363738393031323334353637383930'
+    )
 
+    // @ts-expect-error events ???
     wire.once('extended', () => {
         wire.extended('test_extension', Buffer.from('hello world!'))
     })

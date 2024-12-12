@@ -44,3 +44,15 @@
     "no-multi-spaces": ["error", { "ignoreEOLComments": true }]
   }
 }
+
+// "@stylistic/ts/type-annotation-spacing": ["error", {
+//     "before": false,
+//     "after": false,
+//     "overrides": {
+//       "arrow": {
+//         "before": true,
+//         "after": true
+//       }
+//     }
+//   }
+// ],

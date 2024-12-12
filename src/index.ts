@@ -1,9 +1,13 @@
-/*! bittorrent-protocol. MIT License. WebTorrent LLC <https://webtorrent.io/opensource> */
+/* ! bittorrent-protocol. MIT License. WebTorrent LLC <https://webtorrent.io/opensource> */
 import bencode from 'bencode'
 import BitField from 'bitfield'
 import { webcrypto } from '@bicycle-codes/one-webcrypto'
 import RC4 from 'rc4'
-import { Duplex, type StreamEvents } from 'streamx'
+import {
+    Duplex,
+    type StreamEvents,
+    type WritableEvents
+} from 'streamx'
 import {
     hash,
     concat,
@@ -44,12 +48,12 @@ const CRYPTO_PROVIDE = new Uint8Array([0x00, 0x00, 0x01, 0x02])
 const CRYPTO_SELECT = new Uint8Array([0x00, 0x00, 0x00, 0x02]) // always try to choose RC4 encryption instead of plaintext
 
 class Request {
-    piece
-    offset
-    length
-    callback
+    piece:number
+    offset:number
+    length:number
+    callback:(err?:Error, data?:Uint8Array)=>void
 
-    constructor (piece, offset, length, callback) {
+    constructor (piece:number, offset:number, length:number, callback:()=>void) {
         this.piece = piece
         this.offset = offset
         this.length = length
@@ -122,11 +126,13 @@ class HaveAllBitField {
 //     this._myPubKey = null
 // }
 
-type ProtocolEvents = StreamEvents & {
-    'upload':()=>void;
+type ProtocolEvents = StreamEvents & WritableEvents<any> & {
+    'upload':(data:any)=>void;
     'new-item':(item:string) => void;
     'item-updated':(item:string, newValue:number) => void;
-    'finish':(item:any)=>void
+    'finish':(item:any)=>void;
+    'piping':(data:any)=>any
+    'handshake':(data:any)=>any
 }
 
 // interface ProtocolEvents extends Events {
@@ -135,22 +141,43 @@ type ProtocolEvents = StreamEvents & {
 //     'item-updated': (item: string, newValue: number) => void;
 // }
 
+// interface Ext {
+//     (any):any
+//     onMessage:(buf:Uint8Array)=>void;
+//     onHandshake:(
+//         infoHash:string,
+//         peerId:string,
+//         extensions: { [name: string]: boolean }
+//     )=>void;
+//     onExtendedHandshake?(handshake: { [key: string]: any }): void;
+// }
+
 interface Ext {
-    (any):any
-    onMessage:(any)=>any
-    onHandshake:(arg:any, arg2:any, arg3:any)=>any
-    onExtendedHandshake
+    onHandshake?(
+        infoHash:string,
+        peerId:string,
+        extensions:{ [name: string]: boolean }
+    ):void;
+    onExtendedHandshake?(handshake:{ [key:string]:any }):void;
+    onMessage?(buf:Uint8Array):void;
+    name:string;
 }
 
-class Wire extends Duplex {
+class Wire extends Duplex<any> {
     _debugId:string
     peerId:null|string
     peerIdBuffer:null|Uint8Array
-    type:'webrtc'|'tcpIncoming'|'tcpOutgoing'|'webSeed'|null
-    amChoking:boolean
-    amInterested:boolean
+    readonly type:'webrtc'|'tcpIncoming'|'tcpOutgoing'|'webSeed'|null
     peerChoking:boolean
     peerInterested:boolean
+    readonly requests:any[]  // outgoing
+    readonly peerRequests:any[]  // incoming
+    // number -> string, ex: 1 -> 'ut_metadata'
+    readonly extendedMapping:Record<number, string>
+    // string -> number, ex: 9 -> 'ut_metadata'
+    readonly peerExtendedMapping:Record<string, number>
+    amChoking:boolean
+    amInterested:boolean
     _dhKeys:{ keys:CryptoKeyPair, hex, spki }
     _myPubKey:null|string
     _setGenerators:boolean
@@ -165,10 +192,6 @@ class Wire extends Duplex {
     peerPieces:InstanceType<typeof BitField>|InstanceType<typeof HaveAllBitField>
     extensions:Record<string, any>
     peerExtensions:Record<string, any>
-    requests:any[]  // outgoing
-    peerRequests:any[]  // incoming
-    extendedMapping:Record<number, string>  // number -> string, ex: 1 -> 'ut_metadata'
-    peerExtendedMapping:Record<string, number>  // string -> number, ex: 9 -> 'ut_metadata'
     peerExtendedHandshake
     // The extended handshake to send, minus the "m" field, which gets
     //   automatically filled from `this.extendedMapping`
@@ -318,19 +341,54 @@ class Wire extends Duplex {
         return wire
     }
 
-    on<K extends keyof ProtocolEvents> (ev:K, listener:ProtocolEvents[K]):this {
-        if (ev !== 'upload' && ev !== 'new-item' && ev !== 'item-updated') {
-            return super.on(ev, listener)
-        }
+    on (event:'bitfield', listener:(bitfield:any)=>void):this;
+    on (
+        event:('keep-alive'|'choke'|'unchoke'|'interested'|
+            'uninterested'|'timeout'),
+        listener:()=>void,
+    ):this;
 
-        return this
+    on (event:'upload'|'have'|'download'|'port', listener:(length:number)=>void):this;
+    on (event:'handshake', listener:(
+        infoHash:string,
+        peerId:string,
+        extensions:Ext[]
+    )=>void):this;
+
+    on (
+        event: 'request',
+        listener:(
+            index:number,
+            offset:number,
+            length:number,
+            respond:()=>void
+        )=>void,
+    ):this;
+
+    on (event:'piece', listener: (index:number, offset:number, buffer:Buffer)=>void):this;
+    on (event:'cancel', listener:(index:number, offset:number, length:number)=>void):this;
+    on (event:'extended', listener: (ext:'handshake'|string, buf:any)=>void):void;
+    on (event:'unknownmessage', listener:(buffer:Buffer)=>void):this;
+    on (event:string, listener:(...args:any[])=>void):this;
+
+    on<K extends keyof ProtocolEvents> (ev:K, listener:ProtocolEvents[K]):this {
+        // @ts-expect-error ???
+        return super.on(ev, listener)
+    }
+
+    emit<K extends keyof ProtocolEvents> (
+        evName:K & 'readable',
+        ...rest:any[]
+    ):boolean {
+        // @ts-expect-error ???
+        return super.emit(evName, ...rest)
     }
 
     /**
    * Set whether to send a "keep-alive" ping (sent every 55s)
    * @param {boolean} enable
    */
-    setKeepAlive (enable) {
+    setKeepAlive (enable:boolean):void {
         this._debug('setKeepAlive %s', enable)
         clearInterval(this._keepAliveInterval)
         if (enable === false) return
@@ -344,21 +402,21 @@ class Wire extends Duplex {
    * @param {number} ms
    * @param {boolean=} unref (should the timer be unref'd? default: false)
    */
-    setTimeout (ms:number, unref:boolean) {
+    setTimeout (ms:number, unref:boolean):void {
         this._debug('setTimeout ms=%d unref=%s', ms, unref)
         this._timeoutMs = ms
         this._timeoutUnref = !!unref
         this._resetTimeout(true)
     }
 
-    destroy () {
+    destroy ():this|undefined {
         if (this.destroyed) return
         this._debug('destroy')
         this.end()
         return this
     }
 
-    end (data?:any) {
+    end (data?:any):void {
         if (this.destroyed || this.destroying) return
         this._debug('end')
         this._onUninterested()
@@ -601,8 +659,8 @@ class Wire extends Duplex {
     }
 
     /**
-   * Message "uninterested": <len=0001><id=3>
-   */
+     * Message "uninterested": <len=0001><id=3>
+     */
     uninterested () {
         if (!this.amInterested) return
         this.amInterested = false
@@ -614,7 +672,7 @@ class Wire extends Duplex {
    * Message "have": <len=0005><id=4><piece index>
    * @param  {number} index
    */
-    have (index) {
+    have (index:number):void {
         this._debug('have %d', index)
         this._message(4, [index], null)
     }
@@ -664,7 +722,7 @@ class Wire extends Duplex {
         this._message(7, [index, offset], buffer)
         this.uploaded += buffer.length
         this.uploadSpeed(buffer.length)
-        // @ts-expect-error How to extend the events?
+        // @ts-expect-error ???
         this.emit('upload', buffer.length)
     }
 
@@ -753,7 +811,7 @@ class Wire extends Duplex {
      * @param  {number|string} ext
      * @param  {Object} obj
      */
-    extended (ext:number, obj) {
+    extended (ext:number|string, obj) {
         this._debug('extended ext=%s', ext)
         if (typeof ext === 'string' && this.peerExtendedMapping[ext]) {
             ext = this.peerExtendedMapping[ext]
@@ -939,11 +997,11 @@ class Wire extends Duplex {
             this.hasFast = true
         }
 
-        // @ts-expect-error @TDOD events + types
+        // @ts-expect-error ???
         this.emit('handshake', infoHash, peerId, extensions)
 
         for (const name in this._ext) {
-            this._ext[name].onHandshake(infoHash, peerId, extensions)
+            this._ext[name].onHandshake!(infoHash, peerId, extensions)
         }
 
         if (extensions.extended && this._handshakeSent &&
@@ -1003,7 +1061,7 @@ class Wire extends Duplex {
         this.emit('bitfield', this.peerPieces)
     }
 
-    _onRequest (index, offset, length) {
+    _onRequest (index:number, offset:number, length:number) {
         if (this.amChoking && !(this.hasFast && this.allowedFastSet.includes(index))) {
             // BEP6: If a peer receives a request from a peer its choking, the peer receiving
             // the request SHOULD send a reject unless the piece is in the allowed fast set.
@@ -1012,14 +1070,18 @@ class Wire extends Duplex {
         }
         this._debug('got request index=%d offset=%d length=%d', index, offset, length)
 
-        const respond = (err, buffer) => {
-            if (request !== this._pull(this.peerRequests, index, offset, length)) return
+        const respond = (err?:Error, buffer?:Uint8Array) => {
+            if (request !== this._pull(this.peerRequests, index, offset, length)) {
+                return
+            }
+
             if (err) {
                 this._debug('error satisfying request index=%d offset=%d length=%d (%s)', index, offset, length, err.message)
                 if (this.hasFast) this.reject(index, offset, length)
                 return
             }
-            this.piece(index, offset, buffer)
+
+            this.piece(index, offset, buffer!)
         }
 
         const request = new Request(index, offset, length, respond)
@@ -1149,7 +1211,7 @@ class Wire extends Duplex {
             }
             for (const name in this._ext) {
                 if (this.peerExtendedMapping[name]) {
-                    this._ext[name].onExtendedHandshake(
+                    this._ext[name].onExtendedHandshake!(
                         this.peerExtendedHandshake
                     )
                 }
@@ -1162,7 +1224,7 @@ class Wire extends Duplex {
                 ext = this.extendedMapping[ext] // friendly name for extension
                 if (this._ext[ext]) {
                     // there is an registered extension handler, so call it
-                    this._ext[ext].onMessage(buf)
+                    this._ext[ext].onMessage!(buf)
                 }
             }
             this._debug('got extended message ext=%s', ext)
