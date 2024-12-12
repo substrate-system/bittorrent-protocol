@@ -57,38 +57,46 @@ test('Extension.onExtendedHandshake', async t => {
     t.plan(3)
 
     class TestExtension {
-        name:string
+        // this passes the prototype check
+        get name ():string {
+            return 'test_extension'
+        }
 
         constructor (wire) {
-            this.name = 'test_extension'
             wire.extendedHandshake = {
                 hello: 'world!'
             }
         }
 
         onExtendedHandshake (handshake) {
-            t.ok(handshake.m.test_extension, 'peer extended handshake includes extension name')
-            t.equal(Buffer.from(handshake.hello).toString(), 'world!', 'peer extended handshake includes extension-defined parameters')
+            t.ok(handshake.m.test_extension,
+                'peer extended handshake includes extension name')
+            t.equal(Buffer.from(handshake.hello).toString(), 'world!',
+                'peer extended handshake includes extension-defined parameters')
         }
     }
 
-    const wire = await Protocol.create() // incoming
-    wire.on('error', err => {
-        t.fail('' + err)
+    return new Promise<void>(resolve => {
+        (async () => {
+            const wire = await Protocol.create() // incoming
+            wire.on('error', err => {
+                t.fail('' + err)
+            })
+            wire.pipe(wire)
+
+            // @ts-expect-error events???
+            wire.once('handshake', (_infoHash, _peerId, extensions) => {
+                t.equal(extensions.extended, true)
+                resolve()
+            })
+            wire.use(TestExtension)
+
+            wire.handshake(
+                '3031323334353637383930313233343536373839',
+                '3132333435363738393031323334353637383930'
+            )
+        })()
     })
-    wire.pipe(wire)
-
-    // @ts-expect-error events???
-    wire.once('handshake', (_infoHash, _peerId, extensions) => {
-        t.equal(extensions.extended, true)
-    })
-
-    wire.use(TestExtension)
-
-    wire.handshake(
-        '3031323334353637383930313233343536373839',
-        '3132333435363738393031323334353637383930'
-    )
 })
 
 test('Extension.onMessage', async t => {

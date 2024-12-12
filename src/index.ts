@@ -431,7 +431,8 @@ class Wire extends Duplex<any> {
     use (Extension) {
         const name = Extension.prototype.name
         if (!name) {
-            throw new Error('Extension class requires a "name" property on the prototype')
+            throw new Error('Extension class requires a "name" property on' +
+                ' the prototype')
         }
         this._debug('use extension.name=%s', name)
 
