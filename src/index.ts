@@ -531,7 +531,10 @@ class Wire extends Duplex<any> {
         const view = new DataView(vcAndProvideBuffer.buffer)
 
         view.setInt16(12, padCLen) // pad C length
-        padCBuffer.copy(vcAndProvideBuffer, 14)
+        vcAndProvideBuffer.set(padCBuffer.slice(), 14)
+        // padCBuffer.subarray()
+        // padCBuffer.copy(vcAndProvideBuffer, 14)
+        // padCBuffer.slice(14)
         view.setInt16(14 + padCLen, 0) // IA length
         vcAndProvideBuffer = this._encryptHandshake(vcAndProvideBuffer)
 
