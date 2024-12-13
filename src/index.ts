@@ -131,8 +131,9 @@ type ProtocolEvents = StreamEvents & WritableEvents<any> & {
     'new-item':(item:string) => void;
     'item-updated':(item:string, newValue:number) => void;
     'finish':(item:any)=>void;
-    'piping':(data:any)=>any
-    'handshake':(data:any)=>any
+    'piping':(data:any)=>any;
+    'handshake':(data:any)=>any;
+    'unchoke':()=>any;
 }
 
 // interface ProtocolEvents extends Events {
@@ -315,7 +316,7 @@ class Wire extends Duplex<any> {
         this._decryptGenerator = null // RC4 keystream generator for decryption
         this._setGenerators = false // a flag for whether setEncrypt() has successfully completed
 
-        this.once('finish', () => this._onFinish())
+        // this.once('finish', () => this._onFinish())
 
         this.on('finish', this._onFinish)
         this._debug('type:', this.type)
@@ -341,6 +342,24 @@ class Wire extends Duplex<any> {
         return wire
     }
 
+    once (event:'bitfield', listener:(bitfield:any)=>void):this;
+    once(
+        event:('keep-alive'|'choke'|'unchoke'|'interested'|
+            'uninterested'|'timeout'),
+        listener:()=>void,
+    ):this;
+
+    once(event:'piece', listener: (index:number, offset:number, buffer:Buffer)=>void):this;
+    once(event:'cancel', listener:(index:number, offset:number, length:number)=>void):this;
+    once(event:'extended', listener: (ext:'handshake'|string, buf:any)=>void):void;
+    once(event:'unknownmessage', listener:(buffer:Buffer)=>void):this;
+    once<K extends keyof ProtocolEvents & 'readable'> (
+        event:K,
+        listener:ProtocolEvents[K]
+    ):this {
+        return super.once(event, listener)
+    }
+
     on (event:'bitfield', listener:(bitfield:any)=>void):this;
     on (
         event:('keep-alive'|'choke'|'unchoke'|'interested'|
@@ -352,17 +371,16 @@ class Wire extends Duplex<any> {
     on (event:'handshake', listener:(
         infoHash:string,
         peerId:string,
-        extensions:{ extended:boolean }
+        extensions:{ extended:boolean, fast:boolean }
     )=>void):this;
 
-    // this.emit('request', index, offset, length, respond)
     on (
         event: 'request',
         listener:(
             index:number,
             offset:number,
             length:number,
-            respond:(err, data)=>void
+            respond:(err:Error|null, data?:any)=>void
         )=>void,
     ):this;
 
@@ -993,7 +1011,8 @@ class Wire extends Duplex<any> {
         this.peerIdBuffer = peerIdBuffer
         this.peerExtensions = extensions
 
-        // BEP6 Fast Extension: The extension is enabled only if both ends of the connection set this bit.
+        // BEP6 Fast Extension: The extension is enabled only if both ends of
+        //   the connection set this bit.
         if (this.extensions.fast && this.peerExtensions.fast) {
             this._debug('fast extension is enabled')
             this.hasFast = true

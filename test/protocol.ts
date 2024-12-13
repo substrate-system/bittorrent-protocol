@@ -175,116 +175,160 @@ test('Interested', async t => {
     })
 })
 
-test('Request a piece', t => {
+test('Request a piece', async t => {
     t.plan(12)
 
-    const wire = new Protocol()
-    wire.on('error', err => { t.fail(err) })
-    wire.pipe(wire)
-    wire.handshake(Buffer.from('01234567890123456789'), Buffer.from('12345678901234567890'))
+    let n = 0
+    const wire = await Protocol.create()
+    return new Promise<void>(resolve => {
+        wire.on('error', err => t.fail(err))
+        wire.pipe(wire)
+        wire.handshake(
+            Buffer.from('01234567890123456789'),
+            Buffer.from('12345678901234567890')
+        )
 
-    t.equal(wire.requests.length, 0)
-    t.equal(wire.peerRequests.length, 0)
-
-    wire.on('request', (i, offset, length, callback) => {
-        t.equal(wire.requests.length, 1)
-        t.equal(wire.peerRequests.length, 1)
-        t.equal(i, 0)
-        t.equal(offset, 1)
-        t.equal(length, 11)
-        callback(null, Buffer.from('hello world'))
-    })
-
-    wire.once('unchoke', () => {
         t.equal(wire.requests.length, 0)
-        wire.request(0, 1, 11, (err, buffer) => {
-            t.equal(wire.requests.length, 0)
-            t.ok(!err)
-            t.equal(Buffer.from(buffer).toString(), 'hello world')
-        })
-        t.equal(wire.requests.length, 1)
-    })
+        t.equal(wire.peerRequests.length, 0)
+        n += 2
+        if (n === 12) resolve()
 
-    wire.unchoke()
+        wire.on('request', (i, offset, length, callback) => {
+            t.equal(wire.requests.length, 1)
+            t.equal(wire.peerRequests.length, 1)
+            t.equal(i, 0)
+            t.equal(offset, 1)
+            t.equal(length, 11)
+            n += 5
+            if (n === 12) resolve()
+            callback(null, Buffer.from('hello world'))
+        })
+
+        wire.once('unchoke', () => {
+            t.equal(wire.requests.length, 0)
+            n++
+            wire.request(0, 1, 11, (err, buffer) => {
+                t.equal(wire.requests.length, 0)
+                t.ok(!err)
+                t.equal(Buffer.from(buffer).toString(), 'hello world')
+                n += 3
+                if (n === 12) resolve()
+            })
+            t.equal(wire.requests.length, 1)
+            n++
+            if (n === 12) resolve()
+        })
+
+        wire.unchoke()
+    })
 })
 
-test('No duplicate `have` events for same piece', t => {
-    t.plan(6)
+test('No duplicate `have` events for same piece', async t => {
+    t.plan(5)
 
-    const wire = new Protocol()
-    wire.on('error', err => { t.fail(err) })
+    const wire = await Protocol.create()
+    wire.on('error', err => t.fail(err))
     wire.pipe(wire)
 
-    wire.handshake('3031323334353637383930313233343536373839', '3132333435363738393031323334353637383930')
+    return new Promise<void>(resolve => {
+        wire.handshake(
+            '3031323334353637383930313233343536373839',
+            '3132333435363738393031323334353637383930'
+        )
 
-    let haveEvents = 0
-    wire.on('have', () => {
-        haveEvents += 1
-    })
-    t.equal(haveEvents, 0)
-    t.equal(!!wire.peerPieces.get(0), false)
-    wire.have(0)
-    queueMicrotask(() => {
-        t.equal(haveEvents, 1, 'emitted event for new piece')
-        t.equal(!!wire.peerPieces.get(0), true)
+        let haveEvents = 0
+        wire.on('have', () => {
+            haveEvents += 1
+        })
+        t.equal(haveEvents, 0)
+        t.equal(!!wire.peerPieces.get(0), false)
         wire.have(0)
-        queueMicrotask(() => {
-            t.equal(haveEvents, 1, 'not emitted event for preexisting piece')
-            t.equal(!!wire.peerPieces.get(0), true)
-        })
+
+        setTimeout(() => {
+            t.equal(haveEvents, 1, 'emitted event for new piece')
+            wire.have(0)
+            setTimeout(() => {
+                t.equal(haveEvents, 1, 'not emitted for preexisting piece')
+                t.equal(!!wire.peerPieces.get(0), true)
+                resolve()
+            }, 0)
+        }, 0)
     })
 })
 
-test('Fast Extension: handshake when unsupported', t => {
+test('Fast Extension: handshake when unsupported', async t => {
     t.plan(4)
 
-    const wire1 = new Protocol()
-    const wire2 = new Protocol()
-    wire1.pipe(wire2).pipe(wire1)
-    wire1.on('error', err => { t.fail(err) })
-    wire2.on('error', err => { t.fail(err) })
+    const wire1 = await Protocol.create()
+    const wire2 = await Protocol.create()
 
-    wire1.on('handshake', (infoHash, peerId, extensions) => {
-        t.equal(extensions.fast, false)
-        t.equal(wire1.hasFast, false)
-        t.equal(wire2.hasFast, false)
-    })
+    return new Promise<void>(resolve => {
+        let n = 0
+        wire1.pipe(wire2).pipe(wire1)
+        wire1.on('error', err => t.fail(err))
+        wire2.on('error', err => t.fail(err))
 
-    wire2.on('handshake', (infoHash, peerId, extensions) => {
-        t.equal(extensions.fast, true)
-        // Respond asynchronously
-        queueMicrotask(() => {
-            wire2.handshake(infoHash, peerId, { fast: false }) // no support
+        wire1.on('handshake', (_infoHash, _peerId, extensions) => {
+            t.equal(extensions.fast, false)
+            t.equal(wire1.hasFast, false)
+            t.equal(wire2.hasFast, false)
+            n += 3
+            if (n === 4) resolve()
         })
-    })
 
-    wire1.handshake(Buffer.from('01234567890123456789'), Buffer.from('12345678901234567890'), { fast: true })
+        wire2.on('handshake', (infoHash, peerId, extensions) => {
+            t.equal(extensions.fast, true)
+            n++
+            if (n === 4) resolve()
+
+            // Respond asynchronously
+            setTimeout(() => {
+                wire2.handshake(infoHash, peerId, { fast: false }) // no support
+            }, 0)
+        })
+
+        wire1.handshake(
+            Buffer.from('01234567890123456789'),
+            Buffer.from('12345678901234567890'), { fast: true }
+        )
+    })
 })
 
-test('Fast Extension: handshake when supported', t => {
+test('Fast Extension: handshake when supported', async t => {
     t.plan(4)
 
-    const wire1 = new Protocol()
-    const wire2 = new Protocol()
-    wire1.pipe(wire2).pipe(wire1)
-    wire1.on('error', err => { t.fail(err) })
-    wire2.on('error', err => { t.fail(err) })
+    const wire1 = await Protocol.create()
+    const wire2 = await Protocol.create()
 
-    wire1.on('handshake', (infoHash, peerId, extensions) => {
-        t.equal(extensions.fast, true)
-        t.equal(wire1.hasFast, true)
-        t.equal(wire2.hasFast, true)
-    })
+    return new Promise<void>(resolve => {
+        wire1.pipe(wire2).pipe(wire1)
+        wire1.on('error', err => t.fail(err))
+        wire2.on('error', err => t.fail(err))
 
-    wire2.on('handshake', (infoHash, peerId, extensions) => {
-        t.equal(extensions.fast, true)
-        // Respond asynchronously
-        queueMicrotask(() => {
-            wire2.handshake(infoHash, peerId, { fast: true })
+        let n = 0
+        wire1.on('handshake', (infoHash, peerId, extensions) => {
+            t.equal(extensions.fast, true)
+            t.equal(wire1.hasFast, true)
+            t.equal(wire2.hasFast, true)
+            n += 3
+            if (n === 4) resolve()
         })
-    })
 
-    wire1.handshake(Buffer.from('01234567890123456789'), Buffer.from('12345678901234567890'), { fast: true })
+        wire2.on('handshake', (infoHash, peerId, extensions) => {
+            t.equal(extensions.fast, true)
+            n++
+            if (n === 4) resolve()
+            // Respond asynchronously
+            queueMicrotask(() => {
+                wire2.handshake(infoHash, peerId, { fast: true })
+            })
+        })
+
+        wire1.handshake(
+            Buffer.from('01234567890123456789'),
+            Buffer.from('12345678901234567890'), { fast: true }
+        )
+    })
 })
 
 test('Fast Extension: have-all', t => {
