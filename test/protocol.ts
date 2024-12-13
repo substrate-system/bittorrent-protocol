@@ -331,203 +331,284 @@ test('Fast Extension: handshake when supported', async t => {
     })
 })
 
-test('Fast Extension: have-all', t => {
+test('Fast Extension: have-all', async t => {
     t.plan(2)
 
-    const wire = new Protocol()
-    wire.on('error', err => { t.fail(err) })
-    wire.pipe(wire)
+    const wire = await Protocol.create()
 
-    wire.once('handshake', (infoHash, peerId, extensions) => {
-        t.equal(wire.hasFast, true)
-        wire.haveAll()
+    return new Promise<void>(resolve => {
+        wire.on('error', err => t.fail(err))
+        wire.pipe(wire)
+
+        let n = 0
+        wire.once('handshake', (_infoHash, _peerId, _extensions) => {
+            t.equal(wire.hasFast, true, 'should have `wire.hasFast`')
+            n++
+            if (n === 2) resolve()
+            wire.haveAll()
+        })
+
+        wire.once('have-all', () => {
+            t.ok(true, 'got "have-all" event')
+            n++
+            if (n === 2) resolve()
+        })
+
+        wire.handshake(
+            Buffer.from('01234567890123456789'),
+            Buffer.from('12345678901234567890'), { fast: true }
+        )
     })
-
-    wire.once('have-all', () => {
-        t.ok(true)
-    })
-
-    wire.handshake(Buffer.from('01234567890123456789'), Buffer.from('12345678901234567890'), { fast: true })
 })
 
-test('Fast Extension: have-none', t => {
+test('Fast Extension: have-none', async t => {
     t.plan(2)
 
-    const wire = new Protocol()
-    wire.on('error', err => { t.fail(err) })
-    wire.pipe(wire)
+    const wire = await Protocol.create()
+    return new Promise<void>(resolve => {
+        wire.on('error', err => t.fail(err))
+        wire.pipe(wire)
 
-    wire.once('handshake', (infoHash, peerId, extensions) => {
-        t.equal(wire.hasFast, true)
-        wire.haveNone()
+        let n = 0
+        wire.once('handshake', (_infoHash, _peerId, _extensions) => {
+            t.equal(wire.hasFast, true)
+            n++
+            wire.haveNone()
+            if (n === 2) resolve()
+        })
+
+        wire.once('have-none', () => {
+            t.ok(true)
+            n++
+            if (n === 2) resolve()
+        })
+
+        wire.handshake(
+            Buffer.from('01234567890123456789'),
+            Buffer.from('12345678901234567890'), { fast: true }
+        )
     })
-
-    wire.once('have-none', () => {
-        t.ok(true)
-    })
-
-    wire.handshake(Buffer.from('01234567890123456789'), Buffer.from('12345678901234567890'), { fast: true })
 })
 
-test('Fast Extension: suggest', t => {
+test('Fast Extension: suggest', async t => {
     t.plan(2)
 
-    const wire = new Protocol()
-    wire.on('error', err => { t.fail(err) })
-    wire.pipe(wire)
+    const wire = await Protocol.create()
+    return new Promise<void>(resolve => {
+        wire.on('error', err => t.fail(err))
+        wire.pipe(wire)
+        let n = 0
 
-    wire.once('handshake', (infoHash, peerId, extensions) => {
-        t.equal(wire.hasFast, true)
-        wire.suggest(42)
+        wire.once('handshake', (_infoHash, _peerId, _extensions) => {
+            t.equal(wire.hasFast, true)
+            n++
+            if (n === 2) resolve()
+            wire.suggest(42)
+        })
+
+        wire.once('suggest', (index) => {
+            t.equal(index, 42, 'should callback with the correct number')
+            n++
+            if (n === 2) resolve()
+        })
+
+        wire.handshake(
+            Buffer.from('01234567890123456789'),
+            Buffer.from('12345678901234567890'), { fast: true }
+        )
     })
-
-    wire.once('suggest', (index) => {
-        t.equal(index, 42)
-    })
-
-    wire.handshake(Buffer.from('01234567890123456789'), Buffer.from('12345678901234567890'), { fast: true })
 })
 
-test('Fast Extension: allowed-fast', t => {
+test('Fast Extension: allowed-fast', async t => {
     t.plan(6)
 
-    const wire = new Protocol()
-    wire.on('error', err => { t.fail(err) })
-    wire.pipe(wire)
+    const wire = await Protocol.create()
+    return new Promise<void>(resolve => {
+        wire.on('error', err => t.fail(err))
+        wire.pipe(wire)
 
-    wire.once('handshake', (infoHash, peerId, extensions) => {
-        t.equal(wire.hasFast, true)
-        t.deepEqual(wire.allowedFastSet, [])
-        wire.allowedFast(6)
-        t.deepEqual(wire.allowedFastSet, [6])
-        t.deepEqual(wire.peerAllowedFastSet, [])
+        let n = 0
+        wire.once('handshake', (_infoHash, _peerId, _extensions) => {
+            t.equal(wire.hasFast, true)
+            t.deepEqual(wire.allowedFastSet, [])
+            wire.allowedFast(6)
+            t.deepEqual(wire.allowedFastSet, [6])
+            t.deepEqual(wire.peerAllowedFastSet, [])
+            n += 4
+            if (n === 6) resolve()
+        })
+
+        wire.on('allowed-fast', (index) => {
+            t.equal(index, 6)
+            t.deepEqual(wire.peerAllowedFastSet, [6])
+            n += 2
+            if (n === 6) resolve()
+        })
+
+        wire.handshake(
+            Buffer.from('01234567890123456789'),
+            Buffer.from('12345678901234567890'), { fast: true }
+        )
     })
-
-    wire.on('allowed-fast', (index) => {
-        t.equal(index, 6)
-        t.deepEqual(wire.peerAllowedFastSet, [6])
-    })
-
-    wire.handshake(Buffer.from('01234567890123456789'), Buffer.from('12345678901234567890'), { fast: true })
 })
 
-test('Fast Extension: reject on choke', t => {
+test('Fast Extension: reject on choke', async t => {
     t.plan(14)
 
-    const wire = new Protocol()
-    wire.on('error', err => { t.fail(err) })
+    const wire = await Protocol.create()
+    wire.on('error', err => t.fail(err))
     wire.pipe(wire)
 
-    wire.once('handshake', (infoHash, peerId, extensions) => {
-        t.equal(wire.extensions.fast, true)
-        t.equal(wire.peerExtensions.fast, true)
-        t.equal(wire.hasFast, true)
-        wire.unchoke()
-    })
-
-    wire.once('unchoke', () => {
-        t.equal(wire.requests.length, 0)
-        wire.request(0, 2, 22, (err, buffer) => {
-            t.ok(err)
+    return new Promise<void>(resolve => {
+        let n = 0
+        wire.once('handshake', (_infoHash, _peerId, _extensions) => {
+            t.equal(wire.extensions.fast, true)
+            t.equal(wire.peerExtensions.fast, true)
+            t.equal(wire.hasFast, true)
+            n += 3
+            if (n === 14) resolve()
+            wire.unchoke()
         })
-        t.equal(wire.requests.length, 1)
-        t.equal(wire.peerRequests.length, 0)
+
+        wire.once('unchoke', () => {
+            t.equal(wire.requests.length, 0)
+            wire.request(0, 2, 22, (err, _buffer) => {
+                t.ok(err)
+                n++
+                if (n === 14) resolve()
+            })
+            t.equal(wire.requests.length, 1)
+            t.equal(wire.peerRequests.length, 0)
+            n += 3
+            if (n === 14) resolve()
+        })
+
+        wire.on('request', (i, offset, length) => {
+            t.equal(wire.peerRequests.length, 1)
+            t.equal(i, 0)
+            t.equal(offset, 2)
+            t.equal(length, 22)
+
+            wire.choke()
+            t.equal(wire.peerRequests.length, 0)  // rejected
+            n += 5
+            if (n === 14) resolve()
+        })
+
+        wire.on('choke', () => {
+            t.equal(wire.requests.length, 1) // not implicitly cancelled
+            n++
+            if (n === 14) resolve()
+        })
+
+        wire.on('reject', () => {
+            t.equal(wire.requests.length, 0)
+            n++
+            if (n === 14) resolve()
+        })
+
+        wire.handshake(
+            Buffer.from('01234567890123456789'),
+            Buffer.from('12345678901234567890'), { fast: true }
+        )
     })
-
-    wire.on('request', (i, offset, length, callback) => {
-        t.equal(wire.peerRequests.length, 1)
-        t.equal(i, 0)
-        t.equal(offset, 2)
-        t.equal(length, 22)
-
-        wire.choke()
-        t.equal(wire.peerRequests.length, 0) // rejected
-    })
-
-    wire.on('choke', () => {
-        t.equal(wire.requests.length, 1) // not implicitly cancelled
-    })
-
-    wire.on('reject', () => {
-        t.equal(wire.requests.length, 0)
-    })
-
-    wire.handshake(Buffer.from('01234567890123456789'), Buffer.from('12345678901234567890'), { fast: true })
 })
 
-test('Fast Extension: don\'t reject allowed-fast on choke', t => {
+test('Fast Extension: don\'t reject allowed-fast on choke', async t => {
     t.plan(11)
 
-    const wire = new Protocol()
-    wire.on('error', err => { t.fail(err) })
-    wire.pipe(wire)
+    const wire = await Protocol.create()
+    return new Promise<void>(resolve => {
+        let n = 0
+        wire.on('error', err => t.fail(err))
+        wire.pipe(wire)
 
-    wire.once('handshake', (infoHash, peerId, extensions) => {
-        t.equal(wire.extensions.fast, true)
-        t.equal(wire.peerExtensions.fast, true)
-        t.equal(wire.hasFast, true)
-        wire.allowedFast(6)
-        wire.unchoke()
-    })
-
-    wire.once('unchoke', () => {
-        t.equal(wire.requests.length, 0)
-        wire.request(6, 66, 666, (err, buffer) => {
-            t.fail(err)
+        wire.once('handshake', () => {
+            t.equal(wire.extensions.fast, true)
+            t.equal(wire.peerExtensions.fast, true)
+            t.equal(wire.hasFast, true)
+            n += 3
+            if (n === 11) resolve()
+            wire.allowedFast(6)
+            wire.unchoke()
         })
-        t.equal(wire.requests.length, 1)
-        t.equal(wire.peerRequests.length, 0)
+
+        wire.once('unchoke', () => {
+            t.equal(wire.requests.length, 0)
+            wire.request(6, 66, 666, (err) => {
+                t.fail(err)
+            })
+            t.equal(wire.requests.length, 1)
+            t.equal(wire.peerRequests.length, 0)
+            n += 3
+            if (n === 11) resolve()
+        })
+
+        wire.on('request', (i, offset, length) => {
+            t.equal(wire.peerRequests.length, 1)
+            t.equal(i, 6)
+            t.equal(offset, 66)
+            t.equal(length, 666)
+
+            wire.choke()
+            t.equal(wire.peerRequests.length, 1) // NOT rejected
+            n += 5
+            if (n === 11) resolve()
+        })
+
+        wire.handshake(Buffer.from('01234567890123456789'), Buffer.from('12345678901234567890'), { fast: true })
     })
-
-    wire.on('request', (i, offset, length, callback) => {
-        t.equal(wire.peerRequests.length, 1)
-        t.equal(i, 6)
-        t.equal(offset, 66)
-        t.equal(length, 666)
-
-        wire.choke()
-        t.equal(wire.peerRequests.length, 1) // NOT rejected
-    })
-
-    wire.handshake(Buffer.from('01234567890123456789'), Buffer.from('12345678901234567890'), { fast: true })
 })
 
-test('Fast Extension: reject on error', t => {
+test('Fast Extension: reject on error', async t => {
     t.plan(12)
 
-    const wire = new Protocol()
+    const wire = await Protocol.create()
     wire.on('error', err => { t.fail(err) })
     wire.pipe(wire)
 
-    wire.once('handshake', (infoHash, peerId, extensions) => {
-        t.equal(wire.extensions.fast, true)
-        t.equal(wire.peerExtensions.fast, true)
-        t.equal(wire.hasFast, true)
-        wire.unchoke()
-    })
-
-    wire.once('unchoke', () => {
-        t.equal(wire.requests.length, 0)
-        wire.request(6, 66, 666, (err, buffer) => {
-            t.ok(err)
+    return new Promise<void>(resolve => {
+        let n = 0
+        wire.once('handshake', () => {
+            t.equal(wire.extensions.fast, true)
+            t.equal(wire.peerExtensions.fast, true)
+            t.equal(wire.hasFast, true)
+            n += 3
+            if (n === 12) resolve()
+            wire.unchoke()
         })
-        t.equal(wire.requests.length, 1)
-        t.equal(wire.peerRequests.length, 0)
-    })
 
-    wire.on('request', (i, offset, length, callback) => {
-        t.equal(wire.peerRequests.length, 1)
-        t.equal(i, 6)
-        t.equal(offset, 66)
-        t.equal(length, 666)
-        callback(new Error('cannot satisfy'), null)
-    })
+        wire.once('unchoke', () => {
+            t.equal(wire.requests.length, 0)
+            wire.request(6, 66, 666, (err) => {
+                t.ok(err)
+                n++
+                if (n === 12) resolve()
+            })
+            t.equal(wire.requests.length, 1)
+            t.equal(wire.peerRequests.length, 0)
+            n += 2
+            if (n === 12) resolve()
+        })
 
-    wire.on('reject', () => {
-        t.equal(wire.requests.length, 0)
-    })
+        wire.on('request', (i, offset, length, callback) => {
+            t.equal(wire.peerRequests.length, 1)
+            t.equal(i, 6)
+            t.equal(offset, 66)
+            t.equal(length, 666)
+            n += 4
+            if (n === 12) resolve()
+            callback(new Error('cannot satisfy'), null)
+        })
 
-    wire.handshake(Buffer.from('01234567890123456789'), Buffer.from('12345678901234567890'), { fast: true })
+        wire.on('reject', () => {
+            t.equal(wire.requests.length, 0)
+            n++
+            if (n === 12) resolve()
+        })
+
+        wire.handshake(Buffer.from('01234567890123456789'), Buffer.from('12345678901234567890'), { fast: true })
+    })
 })
 
 test('Fast Extension disabled: have-all', t => {

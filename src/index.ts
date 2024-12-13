@@ -134,6 +134,7 @@ type ProtocolEvents = StreamEvents & WritableEvents<any> & {
     'piping':(data:any)=>any;
     'handshake':(data:any)=>any;
     'unchoke':()=>any;
+    'have-all':()=>void;
 }
 
 // interface ProtocolEvents extends Events {
@@ -343,16 +344,23 @@ class Wire extends Duplex<any> {
     }
 
     once (event:'bitfield', listener:(bitfield:any)=>void):this;
-    once(
+    once (
         event:('keep-alive'|'choke'|'unchoke'|'interested'|
-            'uninterested'|'timeout'),
+            'uninterested'|'timeout'|'have-all'|'have-none'),
         listener:()=>void,
     ):this;
 
-    once(event:'piece', listener: (index:number, offset:number, buffer:Buffer)=>void):this;
-    once(event:'cancel', listener:(index:number, offset:number, length:number)=>void):this;
-    once(event:'extended', listener: (ext:'handshake'|string, buf:any)=>void):void;
-    once(event:'unknownmessage', listener:(buffer:Buffer)=>void):this;
+    once (event:'suggest', listener: (index:number)=>void):this;
+    once (event:'piece', listener: (index:number, offset:number, buffer:Buffer)=>void):this;
+    once (event:'cancel', listener:(index:number, offset:number, length:number)=>void):this;
+    once (event:'extended', listener: (ext:'handshake'|string, buf:any)=>void):void;
+    once (event:'unknownmessage', listener:(buffer:Buffer)=>void):this;
+    once (event:'handshake', listener:(
+        infoHash:string,
+        peerId:string,
+        extensions:{ extended:boolean, fast:boolean }
+    )=>void):this;
+
     once<K extends keyof ProtocolEvents & 'readable'> (
         event:K,
         listener:ProtocolEvents[K]
@@ -360,10 +368,11 @@ class Wire extends Duplex<any> {
         return super.once(event, listener)
     }
 
+    on (event:'suggest', listener: (index:number)=>void):this;
     on (event:'bitfield', listener:(bitfield:any)=>void):this;
     on (
         event:('keep-alive'|'choke'|'unchoke'|'interested'|
-            'uninterested'|'timeout'),
+            'uninterested'|'timeout'|'have-all'|'have-none'),
         listener:()=>void,
     ):this;
 
