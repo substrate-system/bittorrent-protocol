@@ -115,42 +115,64 @@ test('Asynchronous handshake + extended handshake', async t => {
     })
 })
 
-test('Unchoke', t => {
+test('Unchoke', async t => {
     t.plan(4)
 
-    const wire = new Protocol()
-    wire.on('error', err => { t.fail(err) })
-    wire.pipe(wire)
-    wire.handshake(Buffer.from('01234567890123456789'), Buffer.from('12345678901234567890'))
+    const wire = await Protocol.create()
+    return new Promise<void>(resolve => {
+        wire.on('error', err => { t.fail(err) })
+        wire.pipe(wire)
+        wire.handshake(
+            Buffer.from('01234567890123456789'),
+            Buffer.from('12345678901234567890')
+        )
 
-    t.ok(wire.amChoking)
-    t.ok(wire.peerChoking)
+        t.ok(wire.amChoking)
+        t.ok(wire.peerChoking)
 
-    wire.on('unchoke', () => {
-        t.ok(!wire.peerChoking)
+        let n = 0
+        wire.on('unchoke', () => {
+            n++
+            t.ok(!wire.peerChoking)
+            if (n === 2) resolve()
+        })
+
+        wire.unchoke()
+        n++
+        t.ok(!wire.amChoking)
+        if (n === 2) resolve()
     })
-
-    wire.unchoke()
-    t.ok(!wire.amChoking)
 })
 
-test('Interested', t => {
+test('Interested', async t => {
     t.plan(4)
 
-    const wire = new Protocol()
-    wire.on('error', err => { t.fail(err) })
-    wire.pipe(wire)
-    wire.handshake(Buffer.from('01234567890123456789'), Buffer.from('12345678901234567890'))
+    const wire = await Protocol.create()
+    return new Promise<void>(resolve => {
+        let n = 0
+        wire.on('error', err => t.fail(err))
+        wire.pipe(wire)
+        wire.handshake(
+            Buffer.from('01234567890123456789'),
+            Buffer.from('12345678901234567890')
+        )
 
-    t.ok(!wire.amInterested)
-    t.ok(!wire.peerInterested)
+        t.ok(!wire.amInterested)
+        n++
+        t.ok(!wire.peerInterested)
+        n++
 
-    wire.on('interested', () => {
-        t.ok(wire.peerInterested)
+        wire.on('interested', () => {
+            t.ok(wire.peerInterested)
+            n++
+            if (n === 4) resolve()
+        })
+
+        wire.interested()
+        t.ok(wire.amInterested)
+        n++
+        if (n === 4) resolve()
     })
-
-    wire.interested()
-    t.ok(wire.amInterested)
 })
 
 test('Request a piece', t => {
