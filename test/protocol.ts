@@ -564,7 +564,7 @@ test('Fast Extension: reject on error', async t => {
     t.plan(12)
 
     const wire = await Protocol.create()
-    wire.on('error', err => { t.fail(err) })
+    wire.on('error', err => t.fail(err))
     wire.pipe(wire)
 
     return new Promise<void>(resolve => {
@@ -580,6 +580,8 @@ test('Fast Extension: reject on error', async t => {
 
         wire.once('unchoke', () => {
             t.equal(wire.requests.length, 0)
+            n++
+            if (n === 12) resolve()
             wire.request(6, 66, 666, (err) => {
                 t.ok(err)
                 n++
@@ -611,52 +613,87 @@ test('Fast Extension: reject on error', async t => {
     })
 })
 
-test('Fast Extension disabled: have-all', t => {
+test('Fast Extension disabled: have-all', async t => {
     t.plan(3)
-    const wire = new Protocol()
-    t.equal(wire.hasFast, false)
-    t.throws(() => wire.haveAll())
-    wire.on('have-all', () => { t.fail() })
-    wire.on('close', () => { t.pass('wire closed') })
-    wire._onHaveAll()
+    const wire = await Protocol.create()
+    return new Promise<void>(resolve => {
+        t.equal(wire.hasFast, false)
+        t.throws(() => wire.haveAll())
+        wire.on('have-all', () => {
+            t.fail()
+        })
+        wire.on('close', () => {
+            t.ok(true, 'got wire closed event')
+            resolve()
+        })
+
+        wire._onHaveAll()
+    })
 })
 
-test('Fast Extension disabled: have-none', t => {
+test('Fast Extension disabled: have-none', async t => {
     t.plan(3)
-    const wire = new Protocol()
-    t.equal(wire.hasFast, false)
-    t.throws(() => wire.haveNone())
-    wire.on('have-none', () => { t.fail() })
-    wire.on('close', () => { t.pass('wire closed') })
-    wire._onHaveNone()
+    const wire = await Protocol.create()
+    return new Promise<void>(resolve => {
+        t.equal(wire.hasFast, false)
+        t.throws(() => wire.haveNone())
+
+        wire.on('have-none', () => {
+            t.fail('got "have-none" event')
+        })
+
+        wire.on('close', () => {
+            t.ok(true, 'got wire closed event')
+            resolve()
+        })
+
+        wire._onHaveNone()
+    })
 })
 
-test('Fast Extension disabled: suggest', t => {
+test('Fast Extension disabled: suggest', async t => {
     t.plan(3)
-    const wire = new Protocol()
+    const wire = await Protocol.create()
     t.equal(wire.hasFast, false)
     t.throws(() => wire.suggest(42))
-    wire.on('suggest', () => { t.fail() })
-    wire.on('close', () => { t.pass('wire closed') })
-    wire._onSuggest(42)
+    return new Promise<void>(resolve => {
+        wire.on('suggest', () => t.fail())
+        wire.on('close', () => {
+            t.ok(true, 'got "close" event')
+            resolve()
+        })
+        wire._onSuggest(42)
+    })
 })
 
-test('Fast Extension disabled: allowed-fast', t => {
+test('Fast Extension disabled: allowed-fast', async t => {
     t.plan(3)
-    const wire = new Protocol()
+    const wire = await Protocol.create()
     t.equal(wire.hasFast, false)
     t.throws(() => wire.allowedFast(42))
-    wire.on('allowed-fast', () => { t.fail() })
-    wire.on('close', () => { t.pass('wire closed') })
-    wire._onAllowedFast(42)
+
+    return new Promise<void>(resolve => {
+        wire.on('allowed-fast', () => t.fail())
+        wire.on('close', () => {
+            t.ok(true, 'got close event')
+            resolve()
+        })
+
+        wire._onAllowedFast(42)
+    })
 })
 
-test('Fast Extension disabled: reject', t => {
+test('Fast Extension disabled: reject', async t => {
     t.plan(3)
-    const wire = new Protocol()
+    const wire = await Protocol.create()
     t.equal(wire.hasFast, false)
     t.throws(() => wire.reject(42, 0, 99))
-    wire.on('reject', () => { t.fail() })
-    wire.on('close', () => { t.pass('wire closed') })
-    wire._onReject(42, 0, 99)
+    return new Promise<void>(resolve => {
+        wire.on('reject', () => t.fail())
+        wire.on('close', () => {
+            t.ok(true, 'got "close" event')
+            resolve()
+        })
+        wire._onReject(42, 0, 99)
+    })
 })
