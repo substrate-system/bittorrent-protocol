@@ -25,10 +25,11 @@ test('Extension.prototype.name', async t => {
 test('Extension.onHandshake', async t => {
     t.plan(4)
 
+    const wire = await Protocol.create()
     return new Promise<void>((resolve) => {
         const TestExtension = noop
         TestExtension.prototype.name = 'test_extension'
-        TestExtension.prototype.onHandshake = (infoHash, peerId) => {
+        TestExtension.prototype.onHandshake = (infoHash, peerId:string) => {
             t.equal(Buffer.from(infoHash, 'hex').length, 20)
             t.equal(Buffer.from(infoHash, 'hex').toString(), '01234567890123456789')
             t.equal(Buffer.from(peerId, 'hex').length, 20)
@@ -36,20 +37,18 @@ test('Extension.onHandshake', async t => {
             resolve()
         }
 
-        (async () => {
-            const wire = await Protocol.create()
-            wire.on('error', err => {
-                t.fail('' + err)
-            })
-            wire.pipe(wire)
+        wire.on('error', err => {
+            console.log('**error**', err)
+            t.fail('' + err)
+        })
+        wire.pipe(wire)
 
-            wire.use(TestExtension)
+        wire.use(TestExtension)
 
-            wire.handshake(
-                Buffer.from('01234567890123456789'),
-                Buffer.from('12345678901234567890')
-            )
-        })()
+        wire.handshake(
+            Buffer.from('01234567890123456789'),
+            Buffer.from('12345678901234567890')
+        )
     })
 })
 
@@ -76,26 +75,23 @@ test('Extension.onExtendedHandshake', async t => {
         }
     }
 
+    const wire = await Protocol.create() // incoming
     return new Promise<void>(resolve => {
-        (async () => {
-            const wire = await Protocol.create() // incoming
-            wire.on('error', err => {
-                t.fail('' + err)
-            })
-            wire.pipe(wire)
+        wire.on('error', err => {
+            t.fail('' + err)
+        })
+        wire.pipe(wire)
 
-            // @ts-expect-error events???
-            wire.once('handshake', (_infoHash, _peerId, extensions) => {
-                t.equal(extensions.extended, true)
-                resolve()
-            })
-            wire.use(TestExtension)
+        wire.once('handshake', (_infoHash, _peerId, extensions) => {
+            t.equal(extensions.extended, true)
+            resolve()
+        })
+        wire.use(TestExtension)
 
-            wire.handshake(
-                '3031323334353637383930313233343536373839',
-                '3132333435363738393031323334353637383930'
-            )
-        })()
+        wire.handshake(
+            '3031323334353637383930313233343536373839',
+            '3132333435363738393031323334353637383930'
+        )
     })
 })
 
@@ -133,7 +129,6 @@ test('Extension.onMessage', async t => {
                 '3132333435363738393031323334353637383930'
             )
 
-            // @ts-expect-error events ???
             wire.once('extended', () => {
                 wire.extended('test_extension', Buffer.from('hello world!'))
             })

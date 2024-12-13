@@ -49,6 +49,7 @@ test('Handshake (with string args)', async t => {
     })
 })
 
+// this one is failing
 test('Asynchronous handshake + extended handshake', async t => {
     t.plan(9)
     const eventLog:string[] = []
@@ -63,48 +64,52 @@ test('Asynchronous handshake + extended handshake', async t => {
         let n = 0
 
         wire1.on('handshake', (infoHash, peerId, extensions) => {
-            n++
             eventLog.push('w1 hs')
             t.equal(Buffer.from(infoHash, 'hex').toString(), '01234567890123456789')
             t.equal(Buffer.from(peerId, 'hex').toString(), '12345678901234567890')
             t.equal(extensions.extended, true)
-            if (n === 4) resolve()
+            n += 3
+            if (n === 9) resolve()
         })
 
         wire1.on('extended', (ext, obj) => {
-            n++
             if (ext === 'handshake') {
                 eventLog.push('w1 ex')
                 t.ok(obj, 'should get an argument')
+                n++
+                if (n === 9) resolve()
 
-                queueMicrotask(() => {
+                if (n === 9) resolve()
+
+                setTimeout(() => {
                     // Last step: ensure handshakes came before extension protocol
                     t.deepEqual(eventLog, ['w2 hs', 'w1 hs', 'w1 ex', 'w2 ex'])
-                })
+                    n++
+                    if (n === 9) resolve()
+                }, 0)
             }
-            if (n === 4) resolve()
         })
 
         wire2.on('handshake', (infoHash, peerId, extensions) => {
-            n++
             eventLog.push('w2 hs')
             t.equal(Buffer.from(infoHash, 'hex').toString(), '01234567890123456789')
             t.equal(Buffer.from(peerId, 'hex').toString(), '12345678901234567890')
             t.equal(extensions.extended, true)
+            n += 3
+            if (n === 9) resolve()
 
             // Respond asynchronously
             queueMicrotask(() => {
                 wire2.handshake(infoHash, peerId)
             })
-            if (n === 4) resolve()
         })
 
         wire2.on('extended', (ext, obj) => {
             if (ext === 'handshake') {
-                n++
                 eventLog.push('w2 ex')
                 t.ok(obj, 'wire2 extended event')
-                if (n === 4) resolve()
+                n++
+                if (n === 9) resolve()
             }
         })
 

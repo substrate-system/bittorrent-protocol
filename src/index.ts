@@ -1,5 +1,4 @@
-/* ! bittorrent-protocol. MIT License. WebTorrent LLC <https://webtorrent.io/opensource> */
-import bencode from 'bencode'
+import bencode from '@substrate-system/bencode'
 import BitField from 'bitfield'
 import { webcrypto } from '@bicycle-codes/one-webcrypto'
 import RC4 from 'rc4'
@@ -843,14 +842,14 @@ class Wire extends Duplex<any> {
      * @param  {number|string} ext
      * @param  {Object} obj
      */
-    extended (ext:number|string, obj) {
+    extended (ext:number|string, obj:Uint8Array|object) {
         this._debug('extended ext=%s', ext)
         if (typeof ext === 'string' && this.peerExtendedMapping[ext]) {
             ext = this.peerExtendedMapping[ext]
         }
         if (typeof ext === 'number') {
             const extId = new Uint8Array([ext])
-            const buf = ArrayBuffer.isView(obj) ? obj : bencode.encode(obj)
+            const buf = obj instanceof Uint8Array ? obj : bencode.encode(obj)
 
             this._message(20, [], concat([extId, buf]))
         } else {
