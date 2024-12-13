@@ -355,13 +355,14 @@ class Wire extends Duplex<any> {
         extensions:Ext[]
     )=>void):this;
 
+    // this.emit('request', index, offset, length, respond)
     on (
         event: 'request',
         listener:(
             index:number,
             offset:number,
             length:number,
-            respond:()=>void
+            respond:(err, data)=>void
         )=>void,
     ):this;
 
@@ -402,7 +403,7 @@ class Wire extends Duplex<any> {
    * @param {number} ms
    * @param {boolean=} unref (should the timer be unref'd? default: false)
    */
-    setTimeout (ms:number, unref:boolean):void {
+    setTimeout (ms:number, unref?:boolean):void {
         this._debug('setTimeout ms=%d unref=%s', ms, unref)
         this._timeoutMs = ms
         this._timeoutUnref = !!unref
