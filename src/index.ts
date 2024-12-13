@@ -190,7 +190,7 @@ class Wire extends Duplex<any> {
     _peerCryptoProvide  // encryption methods provided by peer; we expect this
     //                     to always contain 0x02
     peerPieces:InstanceType<typeof BitField>|InstanceType<typeof HaveAllBitField>
-    extensions:Record<string, any>
+    extensions:Partial<Record<'extended'|'dht'|'fast', boolean>>
     peerExtensions:Record<string, any>
     peerExtendedHandshake
     // The extended handshake to send, minus the "m" field, which gets
@@ -352,7 +352,7 @@ class Wire extends Duplex<any> {
     on (event:'handshake', listener:(
         infoHash:string,
         peerId:string,
-        extensions:Ext[]
+        extensions:{ extended:boolean }
     )=>void):this;
 
     // this.emit('request', index, offset, length, respond)

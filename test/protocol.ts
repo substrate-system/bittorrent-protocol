@@ -1,87 +1,118 @@
-import test from 'tape'
-import Protocol from '../index.js'
+import { test } from '@substrate-system/tapzero'
+import Protocol from '../src/index.js'
 
-test('Handshake', t => {
+test('Handshake', async t => {
     t.plan(4)
 
-    const wire = new Protocol()
-    wire.on('error', err => { t.fail(err) })
-    wire.pipe(wire)
+    const wire = await Protocol.create()
 
-    wire.on('handshake', (infoHash, peerId) => {
-        t.equal(Buffer.from(infoHash, 'hex').length, 20)
-        t.equal(Buffer.from(infoHash, 'hex').toString(), '01234567890123456789')
-        t.equal(Buffer.from(peerId, 'hex').length, 20)
-        t.equal(Buffer.from(peerId, 'hex').toString(), '12345678901234567890')
+    return new Promise<void>(resolve => {
+        wire.on('error', err => { t.fail(err) })
+        wire.pipe(wire)
+
+        wire.on('handshake', (infoHash, peerId) => {
+            t.equal(Buffer.from(infoHash, 'hex').length, 20)
+            t.equal(Buffer.from(infoHash, 'hex').toString(), '01234567890123456789')
+            t.equal(Buffer.from(peerId, 'hex').length, 20)
+            t.equal(Buffer.from(peerId, 'hex').toString(), '12345678901234567890')
+            resolve()
+        })
+
+        wire.handshake(
+            Buffer.from('01234567890123456789'),
+            Buffer.from('12345678901234567890')
+        )
     })
-
-    wire.handshake(Buffer.from('01234567890123456789'), Buffer.from('12345678901234567890'))
 })
 
-test('Handshake (with string args)', t => {
+test('Handshake (with string args)', async t => {
     t.plan(4)
 
-    const wire = new Protocol()
-    wire.on('error', err => { t.fail(err) })
-    wire.pipe(wire)
+    const wire = await Protocol.create()
 
-    wire.on('handshake', (infoHash, peerId) => {
-        t.equal(Buffer.from(infoHash, 'hex').length, 20)
-        t.equal(Buffer.from(infoHash, 'hex').toString(), '01234567890123456789')
-        t.equal(Buffer.from(peerId, 'hex').length, 20)
-        t.equal(Buffer.from(peerId, 'hex').toString(), '12345678901234567890')
+    return new Promise<void>(resolve => {
+        wire.on('error', err => { t.fail(err) })
+        wire.pipe(wire)
+
+        wire.on('handshake', (infoHash, peerId) => {
+            t.equal(Buffer.from(infoHash, 'hex').length, 20)
+            t.equal(Buffer.from(infoHash, 'hex').toString(), '01234567890123456789')
+            t.equal(Buffer.from(peerId, 'hex').length, 20)
+            t.equal(Buffer.from(peerId, 'hex').toString(), '12345678901234567890')
+            resolve()
+        })
+
+        wire.handshake(
+            '3031323334353637383930313233343536373839',
+            '3132333435363738393031323334353637383930'
+        )
     })
-
-    wire.handshake('3031323334353637383930313233343536373839', '3132333435363738393031323334353637383930')
 })
 
-test('Asynchronous handshake + extended handshake', t => {
-    const eventLog = []
+test('Asynchronous handshake + extended handshake', async t => {
+    t.plan(9)
+    const eventLog:string[] = []
 
-    const wire1 = new Protocol() // outgoing
-    const wire2 = new Protocol() // incoming
+    const wire1 = await Protocol.create()  // outgoing
+    const wire2 = await Protocol.create()  // incoming
     wire1.pipe(wire2).pipe(wire1)
     wire1.on('error', err => { t.fail(err) })
     wire2.on('error', err => { t.fail(err) })
 
-    wire1.on('handshake', (infoHash, peerId, extensions) => {
-        eventLog.push('w1 hs')
-        t.equal(Buffer.from(infoHash, 'hex').toString(), '01234567890123456789')
-        t.equal(Buffer.from(peerId, 'hex').toString(), '12345678901234567890')
-        t.equal(extensions.extended, true)
-    })
-    wire1.on('extended', (ext, obj) => {
-        if (ext === 'handshake') {
-            eventLog.push('w1 ex')
-            t.ok(obj)
+    return new Promise<void>(resolve => {
+        let n = 0
 
-            queueMicrotask(() => {
-                // Last step: ensure handshakes came before extension protocol
-                t.deepEqual(eventLog, ['w2 hs', 'w1 hs', 'w1 ex', 'w2 ex'])
-                t.end()
-            })
-        }
-    })
-
-    wire2.on('handshake', (infoHash, peerId, extensions) => {
-        eventLog.push('w2 hs')
-        t.equal(Buffer.from(infoHash, 'hex').toString(), '01234567890123456789')
-        t.equal(Buffer.from(peerId, 'hex').toString(), '12345678901234567890')
-        t.equal(extensions.extended, true)
-
-        // Respond asynchronously
-        queueMicrotask(() => {
-            wire2.handshake(infoHash, peerId)
+        wire1.on('handshake', (infoHash, peerId, extensions) => {
+            n++
+            eventLog.push('w1 hs')
+            t.equal(Buffer.from(infoHash, 'hex').toString(), '01234567890123456789')
+            t.equal(Buffer.from(peerId, 'hex').toString(), '12345678901234567890')
+            t.equal(extensions.extended, true)
+            if (n === 4) resolve()
         })
-    })
-    wire2.on('extended', (ext, obj) => {
-        if (ext === 'handshake') {
-            eventLog.push('w2 ex')
-            t.ok(obj)
-        }
-    })
 
-    wire1.handshake('3031323334353637383930313233343536373839', '3132333435363738393031323334353637383930')
+        wire1.on('extended', (ext, obj) => {
+            n++
+            if (ext === 'handshake') {
+                eventLog.push('w1 ex')
+                t.ok(obj, 'should get an argument')
+
+                queueMicrotask(() => {
+                    // Last step: ensure handshakes came before extension protocol
+                    t.deepEqual(eventLog, ['w2 hs', 'w1 hs', 'w1 ex', 'w2 ex'])
+                })
+            }
+            if (n === 4) resolve()
+        })
+
+        wire2.on('handshake', (infoHash, peerId, extensions) => {
+            n++
+            eventLog.push('w2 hs')
+            t.equal(Buffer.from(infoHash, 'hex').toString(), '01234567890123456789')
+            t.equal(Buffer.from(peerId, 'hex').toString(), '12345678901234567890')
+            t.equal(extensions.extended, true)
+
+            // Respond asynchronously
+            queueMicrotask(() => {
+                wire2.handshake(infoHash, peerId)
+            })
+            if (n === 4) resolve()
+        })
+
+        wire2.on('extended', (ext, obj) => {
+            if (ext === 'handshake') {
+                n++
+                eventLog.push('w2 ex')
+                t.ok(obj, 'wire2 extended event')
+                if (n === 4) resolve()
+            }
+        })
+
+        wire1.handshake(
+            '3031323334353637383930313233343536373839',
+            '3132333435363738393031323334353637383930'
+        )
+    })
 })
 
 test('Unchoke', t => {
