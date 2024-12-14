@@ -40,11 +40,11 @@ const MESSAGE_PORT = [0x00, 0x00, 0x00, 0x03, 0x09, 0x00, 0x00]
 const MESSAGE_HAVE_ALL = new Uint8Array([0x00, 0x00, 0x00, 0x01, 0x0E])
 const MESSAGE_HAVE_NONE = new Uint8Array([0x00, 0x00, 0x00, 0x01, 0x0F])
 
-// const DH_PRIME = 'ffffffffffffffffc90fdaa22168c234c4c6628b80dc1cd129024e088a67cc74020bbea63b139b22514a08798e3404ddef9519b3cd3a431b302b0a6df25f14374fe1356d6d51c245e485b576625e7ec6f44c42e9a63a36210000000000090563'
-// const DH_GENERATOR = 2
 const VC = new Uint8Array([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
 const CRYPTO_PROVIDE = new Uint8Array([0x00, 0x00, 0x01, 0x02])
-const CRYPTO_SELECT = new Uint8Array([0x00, 0x00, 0x00, 0x02]) // always try to choose RC4 encryption instead of plaintext
+
+// always try to choose RC4 encryption instead of plaintext
+const CRYPTO_SELECT = new Uint8Array([0x00, 0x00, 0x00, 0x02])
 
 class Request {
     piece:number
@@ -74,7 +74,7 @@ class HaveAllBitField {
     set (_index?:number) {}
 }
 
-type ProtocolEvents = StreamEvents & WritableEvents<any> & {
+export type ProtocolEvents = StreamEvents & WritableEvents<any> & {
     'upload':(data:any)=>void;
     'new-item':(item:string) => void;
     'item-updated':(item:string, newValue:number) => void;
@@ -85,7 +85,7 @@ type ProtocolEvents = StreamEvents & WritableEvents<any> & {
     'have-all':()=>void;
 }
 
-interface Ext {
+export interface Ext {
     onHandshake?(
         infoHash:string,
         peerId:string,
@@ -96,7 +96,7 @@ interface Ext {
     name:string;
 }
 
-class Wire extends Duplex<any> {
+export class Wire extends Duplex<any> {
     _debugId:string
     peerId:null|string
     peerIdBuffer:null|Uint8Array
@@ -387,9 +387,10 @@ class Wire extends Duplex<any> {
     }
 
     /**
-   * Use the specified protocol extension.
-   * @param  {function} Extension
-   */
+     * Use the specified protocol extension.
+     *
+     * @param  {function} Extension
+     */
     use (Extension) {
         const name = Extension.prototype.name
         if (!name) {
@@ -425,8 +426,8 @@ class Wire extends Duplex<any> {
     //
 
     /**
-   * Message "keep-alive": <len=0000>
-   */
+     * Message "keep-alive": <len=0000>
+     */
     keepAlive () {
         this._debug('keep-alive')
         this._push(MESSAGE_KEEP_ALIVE)
@@ -446,7 +447,7 @@ class Wire extends Duplex<any> {
         this._push(concat([hex2arr(this._myPubKey as string), padB]))
     }
 
-    async sendPe3 (infoHash) {
+    async sendPe3 (infoHash:string) {
         await this.setEncrypt(this._sharedSecret, infoHash)
 
         const hash1Buffer = await hash(hex2arr(this._utfToHex('req1') + this._sharedSecret))
@@ -475,7 +476,7 @@ class Wire extends Duplex<any> {
         this._push(concat([hash1Buffer, hashesXorBuffer, vcAndProvideBuffer]))
     }
 
-    async sendPe4 (infoHash) {
+    async sendPe4 (infoHash:string) {
         await this.setEncrypt(this._sharedSecret, infoHash)
 
         const padDLen = new DataView(randomBytes(2).buffer).getUint16(0) % 512
@@ -1552,12 +1553,13 @@ class Wire extends Duplex<any> {
         return crypt
     }
 
-    _encrypt (buf) {
+    _encrypt (buf:Uint8Array) {
         const crypt = new Uint8Array(buf)
 
         if (!this._encryptGenerator || this._encryptionMethod !== 2) {
             return crypt
         }
+
         for (let i = 0; i < buf.length; i++) {
             const keystream = this._encryptGenerator.randomByte()
             crypt[i] = crypt[i] ^ keystream
@@ -1566,7 +1568,7 @@ class Wire extends Duplex<any> {
         return crypt
     }
 
-    _decryptHandshake (buf) {
+    _decryptHandshake (buf:Uint8Array) {
         const decrypt = new Uint8Array(buf)
 
         if (!this._decryptGenerator) {
@@ -1581,7 +1583,7 @@ class Wire extends Duplex<any> {
         return decrypt
     }
 
-    _decrypt (buf) {
+    _decrypt (buf:Uint8Array) {
         const decrypt = new Uint8Array(buf)
 
         if (!this._decryptGenerator || this._encryptionMethod !== 2) {
@@ -1601,37 +1603,6 @@ class Wire extends Duplex<any> {
 }
 
 export default Wire
-
-// async function deriveSharedSecret (
-//     // privateKey:CryptoKey,
-//     // otherPublicKey:CryptoKey
-//     privateKey:Uint8Array,
-//     otherPublicKey:Uint8Array
-// ) {
-//     const sharedSecret = await window.crypto.subtle.deriveBits(
-//         {
-//             name: 'ECDH',
-//             public: otherPublicKey,
-//         },
-//         privateKey,
-//         256  // or another desired bit length
-//     )
-
-//     // Convert the shared secret to a usable format (e.g., hex)
-//     const sharedSecretHex = Buffer.from(sharedSecret).toString("hex");
-
-//     return sharedSecretHex
-// }
-
-// Generate Alice's key pair
-// const aliceKeyPair = await crypto.subtle.generateKey(
-//     {
-//         name: 'ECDH',
-//         namedCurve: 'P-256'
-//     },
-//     true,
-//     ['deriveKey', 'deriveBits']
-// )
 
 async function computeSharedSecret (
     privKey:CryptoKey,
@@ -1657,24 +1628,6 @@ async function computeSharedSecret (
     )
 
     return sharedSecret
-
-    // // Bob derives the shared secret using Alice's public key
-    // const bobSharedSecret = await window.crypto.subtle.deriveBits(
-    //     {
-    //         name: 'ECDH',
-    //         public: await webcrypto.subtle.exportKey('spki', aliceKeyPair.publicKey)
-    //     },
-    //     bobKeyPair.privateKey,
-    //     256
-    // )
-
-    // // Convert the shared secret to a hex string (for display or storage)
-    // const aliceSharedSecretHex = arr2hex(new Uint8Array(aliceSharedSecret))
-    // // const aliceSharedSecretHex = Buffer.from(aliceSharedSecret).toString('hex')
-    // const bobSharedSecretHex = Buffer.from(bobSharedSecret).toString('hex')
-
-    // console.log("Alice's shared secret:", aliceSharedSecretHex)
-    // console.log("Bob's shared secret:", bobSharedSecretHex)
 }
 
 async function createDhKeypair ():Promise<{
