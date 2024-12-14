@@ -63,20 +63,20 @@ import Protocol from '@substrate-system/bittorrent-protocol'
 import net from 'net'
 
 net.createServer(async socket => {
-	const wire = await Protocol.create()
+  const wire = await Protocol.create()
 
-	// pipe to and from the protocol
-	socket.pipe(wire).pipe(socket)
-	wire.on('handshake', (infoHash:string, peerId:string) => {
+  // pipe to and from the protocol
+  socket.pipe(wire).pipe(socket)
+  wire.on('handshake', (infoHash:string, peerId:string) => {
     // receive a handshake (infoHash and peerId are hex strings)
 
-		// lets emit a handshake of our own as well
-		wire.handshake('my info hash (hex)', 'my peer id (hex)')
+    // lets emit a handshake of our own as well
+    wire.handshake('my info hash (hex)', 'my peer id (hex)')
 	})
 
-	wire.on('unchoke', () => {
-		console.log('peer is no longer choking us: ' + wire.peerChoking)
-	})
+  wire.on('unchoke', () => {
+    console.log('peer is no longer choking us: ' + wire.peerChoking)
+  })
 }).listen(6881)
 ```
 
@@ -90,7 +90,7 @@ Send and receive a handshake from the peer. This is the first message.
 // send a handshake to the peer
 wire.handshake(infoHash, peerId, { dht: true })
 wire.on('handshake', (infoHash, peerId, extensions) => {
-	// receive a handshake (infoHash and peerId are hex strings)
+  // receive a handshake (infoHash and peerId are hex strings)
   console.log(extensions.dht) // supports DHT (BEP-0005)
   console.log(extensions.extended) // supports extension protocol (BEP-0010)
 })
@@ -107,10 +107,10 @@ wire.peerChoking // is the peer choking us?
 wire.amChoking // are we choking the peer?
 
 wire.on('choke', () => {
-	// the peer is now choking us
+  // the peer is now choking us
 })
 wire.on('unchoke', () => {
-	// peer is no longer choking us
+  // peer is no longer choking us
 })
 ```
 
@@ -119,14 +119,14 @@ wire.on('unchoke', () => {
 See if you or the peer is interested.
 
 ```js
-wire.peerInterested // is the peer interested in us?
-wire.amInterested // are we interested in the peer?
+wire.peerInterested  // is the peer interested in us?
+wire.amInterested  // are we interested in the peer?
 
 wire.on('interested', () => {
-	// peer is now interested
+  // peer is now interested
 })
 wire.on('uninterested', () => {
-	// peer is no longer interested
+  // peer is no longer interested
 })
 ```
 
@@ -138,13 +138,13 @@ Exchange piece information with the peer.
 // send a bitfield to the peer
 wire.bitfield(buffer)
 wire.on('bitfield', bitfield => {
-	// bitfield received from the peer
+  // bitfield received from the peer
 })
 
 // send a have message indicating that you have a piece
 wire.have(pieceIndex)
 wire.on('have', pieceIndex => {
-	// peer has sent you a have message
+  // peer has sent you a have message
 })
 ```
 
@@ -163,11 +163,11 @@ Send and respond to requests for pieces.
 ```js
 // request a block from a peer
 wire.request(pieceIndex, offset, length, (err, block) => {
-	if (err) {
-		// there was an error (peer has started choking us etc)
-		return
-	}
-	// got block
+  if (err) {
+    // there was an error (peer has started choking us etc)
+    return
+  }
+  // got block
 })
 
 // cancel a request to a peer
@@ -175,8 +175,8 @@ wire.cancel(pieceIndex, offset, length)
 
 // receive a request from a peer
 wire.on('request', (pieceIndex, offset, length, callback) => {
-	// ... read block ...
-	callback(null, block) // respond back to the peer
+  // ... read block ...
+  callback(null, block) // respond back to the peer
 })
 
 // list of requests we currently have pending { piece, offset, length }
@@ -204,7 +204,7 @@ the torrent dht. Afterwards you can send your dht port.
 // send your port to the peer
 wire.port(dhtPort)
 wire.on('port', dhtPort => {
-	// peer has sent a port to us
+  // peer has sent a port to us
 })
 ```
 
@@ -224,7 +224,7 @@ You can enable the keep-alive ping (triggered every 60s).
 wire.setKeepAlive(true)
 
 wire.on('keep-alive', () => {
-	// peer sent a keep alive - just ignore it
+  // peer sent a keep alive - just ignore it
 })
 ```
 
