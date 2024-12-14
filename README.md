@@ -8,7 +8,28 @@
 [![license](https://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat-square)](LICENSE)
 
 <details><summary><h2>Contents</h2></summary>
+
 <!-- toc -->
+
+- [Simple, robust, BitTorrent wire protocol implementation](#simple-robust-bittorrent-wire-protocol-implementation)
+- [install](#install)
+- [usage](#usage)
+- [methods](#methods)
+  * [handshaking](#handshaking)
+  * [choking](#choking)
+  * [interested](#interested)
+  * [bitfield](#bitfield)
+  * [requests](#requests)
+  * [dht and port](#dht-and-port)
+  * [keep-alive](#keep-alive)
+  * [fast extension (BEP 6)](#fast-extension-bep-6)
+  * [extension protocol (BEP 10)](#extension-protocol-bep-10)
+  * [transfer stats](#transfer-stats)
+- [extension api](#extension-api)
+- [license](#license)
+
+<!-- tocstop -->
+
 </details>
 
 ## Simple, robust, BitTorrent wire protocol implementation
