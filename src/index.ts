@@ -50,7 +50,7 @@ class Request {
     piece:number
     offset:number
     length:number
-    callback:(err?:Error, data?:Uint8Array)=>void
+    callback:(err:Error|null, data?:Uint8Array)=>void
 
     constructor (piece:number, offset:number, length:number, callback:()=>void) {
         this.piece = piece
@@ -74,57 +74,6 @@ class HaveAllBitField {
     set (_index?:number) {}
 }
 
-// this.peerPieces = new BitField(0, { grow: BITFIELD_GROW })
-
-// this.extensions = {}
-// this.peerExtensions = {}
-
-// this.requests = [] // outgoing
-// this.peerRequests = [] // incoming
-
-// this.extendedMapping = {} // number -> string, ex: 1 -> 'ut_metadata'
-// this.peerExtendedMapping = {} // string -> number, ex: 9 -> 'ut_metadata'
-
-// // The extended handshake to send, minus the "m" field, which gets automatically
-// // filled from `this.extendedMapping`
-// this.extendedHandshake = {}
-
-// this.peerExtendedHandshake = {} // remote peer's extended handshake
-
-// // BEP6 Fast Estension
-// this.hasFast = false // is fast extension enabled?
-// this.allowedFastSet = [] // allowed fast set
-// this.peerAllowedFastSet = [] // peer's allowed fast set
-
-// this._ext = {} // string -> function, ex 'ut_metadata' -> ut_metadata()
-// this._nextExt = 1
-
-// this.uploaded = 0
-// this.downloaded = 0
-// this.uploadSpeed = throughput()
-// this.downloadSpeed = throughput()
-
-// this._keepAliveInterval = null
-// this._timeout = null
-// this._timeoutMs = 0
-// this._timeoutExpiresAt = null
-
-// this._finished = false
-
-// this._parserSize = 0 // number of needed bytes to parse next message from remote peer
-// this._parser = null // function to call once `this._parserSize` bytes are available
-
-// this._buffer = [] // incomplete message data
-// this._bufferSize = 0 // cached total length of buffers in `this._buffer`
-
-// this._peEnabled = peEnabled
-// if (peEnabled) {
-//     this._dh = crypto.createDiffieHellman(DH_PRIME, 'hex', DH_GENERATOR) // crypto object used to generate keys/secret
-//     this._myPubKey = this._dh.generateKeys('hex') // my DH public key
-// } else {
-//     this._myPubKey = null
-// }
-
 type ProtocolEvents = StreamEvents & WritableEvents<any> & {
     'upload':(data:any)=>void;
     'new-item':(item:string) => void;
@@ -135,23 +84,6 @@ type ProtocolEvents = StreamEvents & WritableEvents<any> & {
     'unchoke':()=>any;
     'have-all':()=>void;
 }
-
-// interface ProtocolEvents extends Events {
-//     'upload':()=>void;
-//     'new-item': (item: string) => void;
-//     'item-updated': (item: string, newValue: number) => void;
-// }
-
-// interface Ext {
-//     (any):any
-//     onMessage:(buf:Uint8Array)=>void;
-//     onHandshake:(
-//         infoHash:string,
-//         peerId:string,
-//         extensions: { [name: string]: boolean }
-//     )=>void;
-//     onExtendedHandshake?(handshake: { [key: string]: any }): void;
-// }
 
 interface Ext {
     onHandshake?(
@@ -316,8 +248,6 @@ class Wire extends Duplex<any> {
         this._decryptGenerator = null // RC4 keystream generator for decryption
         this._setGenerators = false // a flag for whether setEncrypt() has successfully completed
 
-        // this.once('finish', () => this._onFinish())
-
         this.on('finish', this._onFinish)
         this._debug('type:', this.type)
 
@@ -332,6 +262,11 @@ class Wire extends Duplex<any> {
         }
     }
 
+    /**
+     * Factory function b/c async.
+     *
+     * @returns { Wire } A new Wire instance.
+     */
     static async create (
         type = null,
         retries = 0,

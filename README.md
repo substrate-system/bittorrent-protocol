@@ -42,6 +42,18 @@ npm i -S @substrate-system/bittorrent-protocol
 
 ## usage
 
+### create
+
+Call `.create()` to create a new instance, because it is async.
+
+```js
+import Protocol from '@substrate-system/bittorrent-protocol'
+
+const wire = await Protocol.create()
+```
+
+### streamx
+
 The protocol is implemented as a [streamx](https://github.com/mafintosh/streamx) **duplex stream**, so all you have to do is pipe to and from it.
 
 ```ts
@@ -165,14 +177,17 @@ wire.on('request', (pieceIndex, offset, length, callback) => {
 	callback(null, block) // respond back to the peer
 })
 
-wire.requests     // list of requests we currently have pending {piece, offset, length}
-wire.peerRequests // list of requests the peer currently have pending {piece, offset, length}
+// list of requests we currently have pending { piece, offset, length }
+wire.requests
+
+// list of requests the peer currently has pending { piece, offset, length }
+wire.peerRequests
 ```
 
 You can set a request timeout if you want to.
 
 ```js
-wire.setTimeout(5000) // head request should take a most 5s to finish
+wire.setTimeout(5000)  // head request should take a most 5s to finish
 ```
 
 If the timeout is triggered the request callback is called with an error and a `timeout`
@@ -194,8 +209,8 @@ wire.on('port', dhtPort => {
 You can check to see if the peer supports extensions.
 
 ```js
-wire.peerExtensions.dht // supports DHT (bep_0005)
-wire.peerExtensions.extended // supports extended messages (bep_0005)
+wire.peerExtensions.dht  // supports DHT (bep_0005)
+wire.peerExtensions.extended  // supports extended messages (bep_0005)
 ```
 
 ### keep-alive
@@ -205,10 +220,12 @@ You can enable the keep-alive ping (triggered every 60s).
 ```js
 // starts the keep alive
 wire.setKeepAlive(true)
+
 wire.on('keep-alive', () => {
 	// peer sent a keep alive - just ignore it
 })
 ```
+
 ### fast extension (BEP 6)
 
 This module has built-in support for the
@@ -220,9 +237,12 @@ have-none, have-all, suggest, reject, and allowed-fast.
 ```js
 wire.handshake(infoHash, peerId, { fast: true })
 
-wire.hasFast // true if Fast Extension is available, required to call the following methods
+// true if Fast Extension is available, required to call the following methods
+wire.hasFast
 
-wire.haveNone() // instead of wire.bitfield(buffer) with an all-zero buffer
+// instead of wire.bitfield(buffer) with an all-zero buffer
+wire.haveNone() 
+
 wire.on('have-none', () => {
   // instead of bitfield with an all-zero buffer
 })
@@ -241,7 +261,7 @@ wire.on('allowed-fast', (pieceIndex) => {
   // piece may be obtained from peer while choked
 })
 
-wire.peerAllowedFastSet // list of allowed-fast pieces
+wire.peerAllowedFastSet  // list of allowed-fast pieces
 
 // Note rejection is handled automatically on choke or request error
 wire.reject(pieceIndex, offset, length) // reject a request
@@ -279,17 +299,17 @@ See the [Extension API](#extension-api) section for more information.
 Check how many bytes you have uploaded and download, and current speed
 
 ```js
-wire.uploaded // number of bytes uploaded
-wire.downloaded // number of bytes downloaded
+wire.uploaded  // number of bytes uploaded
+wire.downloaded  // number of bytes downloaded
 
-wire.uploadSpeed() // upload speed - bytes per second
-wire.downloadSpeed() // download speed - bytes per second
+wire.uploadSpeed()  // upload speed - bytes per second
+wire.downloadSpeed()  // download speed - bytes per second
 
 wire.on('download', numberOfBytes => {
-  ...
+  // ...
 })
 wire.on('upload', numberOfBytes => {
-  ...
+  // ...
 })
 ```
 
@@ -319,7 +339,7 @@ import net from 'net'
 import ut_metadata from 'ut_metadata'
 
 net.createServer(socket => {
-  const wire = new Protocol()
+  const wire = await Protocol.create()
   socket.pipe(wire).pipe(socket)
 
   // initialize the extension
@@ -350,7 +370,6 @@ net.createServer(socket => {
     // receive a handshake (infoHash and peerId are hex strings)
     wire.handshake(new Buffer('my info hash'), new Buffer('my peer id'))
   })
-
 }).listen(6881)
 ```
 
