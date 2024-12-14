@@ -18,7 +18,7 @@ test('Extension.prototype.name', async t => {
         wire.use(NamedExtension)
         t.ok(true, 'does not throw when Extension.prototype.name is defined')
     } catch (err) {
-        t.ok(!err, 'should now throw')
+        t.ok(!err, 'should not throw')
     }
 })
 
