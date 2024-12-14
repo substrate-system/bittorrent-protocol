@@ -14,7 +14,6 @@ The protocol is the main communication layer for BitTorrent file transfer.
 
 <!-- toc -->
 
-- [Simple, robust, BitTorrent wire protocol implementation](#simple-robust-bittorrent-wire-protocol-implementation)
 - [install](#install)
 - [usage](#usage)
 - [methods](#methods)
