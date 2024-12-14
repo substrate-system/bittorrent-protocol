@@ -10,7 +10,7 @@ test('Handshake', async t => {
         wire.on('error', err => { t.fail(err) })
         wire.pipe(wire)
 
-        wire.on('handshake', (infoHash, peerId) => {
+        wire.on('handshake', (infoHash:string, peerId:string) => {
             t.equal(Buffer.from(infoHash, 'hex').length, 20)
             t.equal(Buffer.from(infoHash, 'hex').toString(), '01234567890123456789')
             t.equal(Buffer.from(peerId, 'hex').length, 20)

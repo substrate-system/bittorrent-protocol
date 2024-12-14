@@ -1,5 +1,5 @@
 import bencode from '@substrate-system/bencode'
-import BitField from 'bitfield'
+import BitField from '@substrate-system/bitfield'
 import { webcrypto } from '@bicycle-codes/one-webcrypto'
 import RC4 from 'rc4'
 import {

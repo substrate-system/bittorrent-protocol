@@ -38,10 +38,10 @@
   },
   "dependencies": {
     "@bicycle-codes/one-webcrypto": "^1.1.2",
+    "@substrate-system/bencode": "^4.0.0",
+    "@substrate-system/bitfield": "^4.2.2",
     "@substrate-system/throughput": "^1.0.2",
     "@substrate-system/uint8-util": "^2.2.22",
-    "@substrate-system/bencode": "^4.0.0",
-    "bitfield": "^4.1.0",
     "debug": "^4.4.0",
     "events": "^3.3.0",
     "rc4": "^0.1.5",
@@ -67,6 +67,11 @@
     "typedoc": "^0.27.0",
     "typescript": "^5.4.5"
   },
+  "author": {
+    "name": "WebTorrent LLC",
+    "email": "feross@webtorrent.io",
+    "url": "https://webtorrent.io"
+  },
   "contributors": [
     {
       "name": "Nick Thomas",
@@ -74,11 +79,6 @@
       "url": "https://nichoth.com/"
     }
   ],
-  "author": {
-    "name": "WebTorrent LLC",
-    "email": "feross@webtorrent.io",
-    "url": "https://webtorrent.io"
-  },
   "bugs": {
     "url": "https://github.com/substrate-system/bittorrent-protocol/issues"
   },

@@ -1,50 +1,41 @@
-# bittorrent-protocol [![travis][travis-image]][travis-url] [![npm][npm-image]][npm-url] [![downloads][downloads-image]][downloads-url] [![javascript style guide][standard-image]][standard-url]
+# bittorrent-protocol
+![tests](https://github.com/substrate-system/bittorrent-protocol/actions/workflows/nodejs.yml/badge.svg)
+[![types](https://img.shields.io/npm/types/@substrate-system/bittorrent-protocol?style=flat-square)](README.md)
+[![module](https://img.shields.io/badge/module-ESM%2FCJS-blue?style=flat-square)](README.md)
+[![semantic versioning](https://img.shields.io/badge/semver-2.0.0-blue?logo=semver&style=flat-square)](https://semver.org/)
+[![Common Changelog](https://nichoth.github.io/badge/common-changelog.svg)](./CHANGELOG.md)
+[![install size](https://flat.badgen.net/packagephobia/install/@substrate-system/bittorrent-[protocol])](https://packagephobia.com/result?p=@substrate-system/bittorrent-protocol)
+[![license](https://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat-square)](LICENSE)
 
-[travis-image]: https://img.shields.io/travis/webtorrent/bittorrent-protocol/master.svg
-[travis-url]: https://travis-ci.org/webtorrent/bittorrent-protocol
-[npm-image]: https://img.shields.io/npm/v/bittorrent-protocol.svg
-[npm-url]: https://npmjs.org/package/bittorrent-protocol
-[downloads-image]: https://img.shields.io/npm/dm/bittorrent-protocol.svg
-[downloads-url]: https://npmjs.org/package/bittorrent-protocol
-[standard-image]: https://img.shields.io/badge/code_style-standard-brightgreen.svg
-[standard-url]: https://standardjs.com
+<details><summary><h2>Contents</h2></summary>
+<!-- toc -->
+</details>
 
-### Simple, robust, BitTorrent wire protocol implementation
+## Simple, robust, BitTorrent wire protocol implementation
 
-Node.js implementation of the [BitTorrent peer wire protocol](https://wiki.theory.org/BitTorrentSpecification#Peer_wire_protocol_.28TCP.29).
+Typescript implementation of the [BitTorrent peer wire protocol](https://wiki.theory.org/BitTorrentSpecification#Peer_wire_protocol_.28TCP.29).
 The protocol is the main communication layer for BitTorrent file transfer.
-
-Also works in the browser with [browserify](http://browserify.org/)! This module is used
-by [WebTorrent](http://webtorrent.io).
 
 ## install
 
-```
-npm install bittorrent-protocol
+```sh
+npm i -S @substrate-system/bittorrent-protocol
 ```
 
 ## usage
 
-The protocol is implemented as a **duplex stream**, so all you have to do is pipe to and
-from it.
+The protocol is implemented as a [streamx](https://github.com/mafintosh/streamx) **duplex stream**, so all you have to do is pipe to and from it.
 
-duplex streams | a.pipe(b).pipe(a)
----- | ---
-![duplex streams](https://raw.github.com/substack/lxjs-stream-examples/master/images/duplex_streams.png) | ![a.pipe(b).pipe(a)](https://raw.github.com/substack/lxjs-stream-examples/master/images/a_pipe_b_pipe_a.png)
-
-(Images from the ["harnessing streams"](https://github.com/substack/lxjs-stream-examples/blob/master/slides.markdown) talk by substack.)
-
-```js
-import Protocol from 'bittorrent-protocol'
+```ts
+import Protocol from '@substrate-system/bittorrent-protocol'
 import net from 'net'
 
-net.createServer(socket => {
-	const wire = new Protocol()
+net.createServer(async socket => {
+	const wire = await Protocol.create()
 
 	// pipe to and from the protocol
 	socket.pipe(wire).pipe(socket)
-
-	wire.on('handshake', (infoHash, peerId) => {
+	wire.on('handshake', (infoHash:string, peerId:string) => {
     // receive a handshake (infoHash and peerId are hex strings)
 
 		// lets emit a handshake of our own as well
