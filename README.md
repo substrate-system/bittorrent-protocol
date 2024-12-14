@@ -103,8 +103,8 @@ For `wire.handshake()`, the `infoHash` and the `peerId` should be 20 bytes (hex-
 Check if you or the peer is choking.
 
 ```js
-wire.peerChoking // is the peer choking us?
-wire.amChoking // are we choking the peer?
+wire.peerChoking  // is the peer choking us?
+wire.amChoking  // are we choking the peer?
 
 wire.on('choke', () => {
   // the peer is now choking us
@@ -151,7 +151,7 @@ wire.on('have', pieceIndex => {
 You can always see which pieces the peer has
 
 ```js
-wire.peerPieces.get(i) // returns true if peer has piece i
+wire.peerPieces.get(i)  // returns true if peer has piece i
 ```
 
 `wire.peerPieces` is a `BitField`, see [docs](https://www.npmjs.org/package/bitfield).
@@ -249,7 +249,7 @@ wire.on('have-none', () => {
   // instead of bitfield with an all-zero buffer
 })
 
-wire.haveAll() // instead of wire.bitfield(buffer) with an all-one buffer
+wire.haveAll()  // instead of wire.bitfield(buffer) with an all-one buffer
 wire.on('have-all', () => {
   // instead of bitfield with an all-one buffer
 })
