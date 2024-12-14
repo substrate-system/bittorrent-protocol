@@ -16,6 +16,8 @@ The protocol is the main communication layer for BitTorrent file transfer.
 
 - [install](#install)
 - [usage](#usage)
+  * [create](#create)
+  * [streamx](#streamx)
 - [methods](#methods)
   * [handshaking](#handshaking)
   * [choking](#choking)
