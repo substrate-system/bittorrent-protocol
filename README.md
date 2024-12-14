@@ -7,6 +7,9 @@
 [![install size](https://flat.badgen.net/packagephobia/install/@substrate-system/bittorrent-protocol?cache-control=no-cache)](https://packagephobia.com/result?p=@substrate-system/bittorrent-protocol)
 [![license](https://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat-square)](LICENSE)
 
+Typescript implementation of the [BitTorrent peer wire protocol](https://wiki.theory.org/BitTorrentSpecification#Peer_wire_protocol_.28TCP.29).
+The protocol is the main communication layer for BitTorrent file transfer.
+
 <details><summary><h2>Contents</h2></summary>
 
 <!-- toc -->
@@ -31,11 +34,6 @@
 <!-- tocstop -->
 
 </details>
-
-## Simple, robust, BitTorrent wire protocol implementation
-
-Typescript implementation of the [BitTorrent peer wire protocol](https://wiki.theory.org/BitTorrentSpecification#Peer_wire_protocol_.28TCP.29).
-The protocol is the main communication layer for BitTorrent file transfer.
 
 ## install
 
