@@ -1,6 +1,7 @@
 import bencode from '@substrate-system/bencode'
 import BitField from '@substrate-system/bitfield'
-import { webcrypto } from '@bicycle-codes/one-webcrypto'
+import dh from 'diffie-hellman'
+// import { webcrypto } from '@bicycle-codes/one-webcrypto'
 import RC4 from 'rc4'
 import {
     Duplex,
@@ -25,6 +26,8 @@ const debug = Debug('bittorrent-protocol')
 const BITFIELD_GROW = 400000
 const KEEP_ALIVE_TIMEOUT = 55000
 const ALLOWED_FAST_SET_MAX_LENGTH = 100
+const DH_PRIME = 'ffffffffffffffffc90fdaa22168c234c4c6628b80dc1cd129024e088a67cc74020bbea63b139b22514a08798e3404ddef9519b3cd3a431b302b0a6df25f14374fe1356d6d51c245e485b576625e7ec6f44c42e9a63a36210000000000090563'
+const DH_GENERATOR = 2
 
 const MESSAGE_PROTOCOL = text2arr('\u0013BitTorrent protocol')
 const MESSAGE_KEEP_ALIVE = new Uint8Array([0x00, 0x00, 0x00, 0x00])
@@ -111,7 +114,8 @@ export class Wire extends Duplex<any> {
     readonly peerExtendedMapping:Record<string, number>
     amChoking:boolean
     amInterested:boolean
-    _dhKeys:{ keys:CryptoKeyPair, hex, spki }
+    _dh:any|null = null
+    // _dhKeys:{ keys:CryptoKeyPair, hex, spki }
     _myPubKey:null|string
     _setGenerators:boolean
     _decryptGenerator
@@ -162,7 +166,6 @@ export class Wire extends Duplex<any> {
     _extendedHandshakeSent?:boolean
 
     constructor (
-        dhKeys:{ keys:CryptoKeyPair, hex:string, spki:ArrayBuffer },
         type = null,
         retries = 0,
         peEnabled = false,
@@ -228,10 +231,11 @@ export class Wire extends Duplex<any> {
         this._peEnabled = peEnabled
         if (peEnabled) {
             // crypto object used to generate keys/secret
-            // this._dh = crypto.createDiffieHellman(DH_PRIME, 'hex', DH_GENERATOR)
+            this._dh = dh.createDiffieHellman(DH_PRIME, 'hex', DH_GENERATOR)
+            this._myPubKey = this._dh!.generateKeys('hex')  // my DH public key
             // this._dh = await createDhKeypair()
-            // this._myPubKey = this._dh.generateKeys('hex')  // my DH public key
-            this._myPubKey = dhKeys.hex
+            // this._myPubKey = this._dh.generateKeys('hex')
+            // this._myPubKey = dhKeys.hex
         } else {
             this._myPubKey = null
         }
@@ -240,7 +244,7 @@ export class Wire extends Duplex<any> {
         this._peerCryptoProvide = [] // encryption methods provided by peer; we expect this to always contain 0x02
         this._cryptoHandshakeDone = false
 
-        this._dhKeys = dhKeys
+        // this._dhKeys = dhKeys
         this._cryptoSyncPattern = null // the pattern to search for when resynchronizing after receiving pe1/pe2
         this._waitMaxBytes = null // the maximum number of bytes resynchronization must occur within
         this._encryptionMethod = null // 1 for plaintext, 2 for RC4
@@ -272,8 +276,8 @@ export class Wire extends Duplex<any> {
         retries = 0,
         peEnabled = false
     ):Promise<InstanceType<typeof Wire>> {
-        const dhKeys = await createDhKeypair()
-        const wire = new Wire(dhKeys, type, retries, peEnabled)
+        // const dhKeys = await createDhKeypair()
+        const wire = new Wire(type, retries, peEnabled)
         return wire
     }
 
@@ -885,34 +889,24 @@ export class Wire extends Duplex<any> {
         this.emit('keep-alive')
     }
 
-    async _onPe1 (pubKeyBuffer) {
+    _onPe1 (pubKeyBuffer) {
         this._peerPubKey = arr2hex(pubKeyBuffer)
-        // this._sharedSecret = this._dh.computeSecret(this._peerPubKey, 'hex', 'hex')
-        const secret = await computeSharedSecret(
-            this._dhKeys.keys.privateKey,
-            this._peerPubKey
-        )
-        this._sharedSecret = arr2hex(new Uint8Array(secret))
+        this._sharedSecret = this._dh.computeSecret(this._peerPubKey, 'hex', 'hex')
         // @ts-expect-error @TDOD extend events
         this.emit('pe1')
     }
 
-    async _onPe2 (pubKeyBuffer) {
+    _onPe2 (pubKeyBuffer) {
         this._peerPubKey = arr2hex(pubKeyBuffer)
-        const secret = await computeSharedSecret(
-            this._dhKeys.keys.privateKey,
-            this._peerPubKey
-        )
-        this._sharedSecret = arr2hex(new Uint8Array(secret))
-        // this._sharedSecret = this._dh.computeSecret(this._peerPubKey, 'hex', 'hex')
-        // @ts-expect-error @TDOD extend events
+        this._sharedSecret = this._dh.computeSecret(this._peerPubKey, 'hex', 'hex')
+        // @ts-expect-error @TODO events
         this.emit('pe2')
     }
 
     async _onPe3 (hashesXorBuffer:Uint8Array) {
-        const hash3 = hex2arr(this._utfToHex('req3') + this._sharedSecret)
+        const hash3 = await hex2arr(this._utfToHex('req3') + this._sharedSecret)
         const sKeyHash = arr2hex(xor(hash3, hashesXorBuffer))
-        // @ts-expect-error @TDOD extend events
+        // @ts-expect-error events
         this.emit('pe3', sKeyHash)
     }
 
@@ -1604,47 +1598,47 @@ export class Wire extends Duplex<any> {
 
 export default Wire
 
-async function computeSharedSecret (
-    privKey:CryptoKey,
-    pubKey:ArrayBuffer
-):Promise<ArrayBuffer> {
-    const publicKey = await webcrypto.subtle.importKey(
-        'spki',
-        pubKey,
-        'ECDH',
-        true,
-        ['deriveBits']
-    )
+// async function computeSharedSecret (
+//     privKey:CryptoKey,
+//     pubKey:ArrayBuffer
+// ):Promise<ArrayBuffer> {
+//     const publicKey = await webcrypto.subtle.importKey(
+//         'spki',
+//         pubKey,
+//         'ECDH',
+//         true,
+//         ['deriveBits']
+//     )
 
-    // Alice derives the shared secret using Bob's public key
-    const sharedSecret = await window.crypto.subtle.deriveBits(
-        {
-            name: 'ECDH',
-            public: publicKey
-            // public: await webcrypto.subtle.exportKey('spki', bobKeyPair.publicKey)
-        },
-        privKey,
-        256  // The desired length of the shared secret in bits
-    )
+//     // Alice derives the shared secret using Bob's public key
+//     const sharedSecret = await window.crypto.subtle.deriveBits(
+//         {
+//             name: 'ECDH',
+//             public: publicKey
+//             // public: await webcrypto.subtle.exportKey('spki', bobKeyPair.publicKey)
+//         },
+//         privKey,
+//         256  // The desired length of the shared secret in bits
+//     )
 
-    return sharedSecret
-}
+//     return sharedSecret
+// }
 
-async function createDhKeypair ():Promise<{
-    keys:CryptoKeyPair;
-    hex:string;
-    spki:ArrayBuffer;
-}> {
-    const keys = await webcrypto.subtle.generateKey({
-        name: 'ECDH',
-        namedCurve: 'P-256',
-    }, true, ['deriveKey'])
+// async function createDhKeypair ():Promise<{
+//     keys:CryptoKeyPair;
+//     hex:string;
+//     spki:ArrayBuffer;
+// }> {
+//     const keys = await webcrypto.subtle.generateKey({
+//         name: 'ECDH',
+//         namedCurve: 'P-256',
+//     }, true, ['deriveKey'])
 
-    const publicKey = await webcrypto.subtle.exportKey('spki', keys.publicKey)
-    const hex = arr2hex(new Uint8Array(publicKey))
+//     const publicKey = await webcrypto.subtle.exportKey('spki', keys.publicKey)
+//     const hex = arr2hex(new Uint8Array(publicKey))
 
-    return { keys, hex, spki: publicKey }
-}
+//     return { keys, hex, spki: publicKey }
+// }
 
 function xor (a:Uint8Array, b:Uint8Array):Uint8Array {
     for (let len = a.length; len--;) {
