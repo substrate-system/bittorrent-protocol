@@ -14,8 +14,8 @@
   },
   "scripts": {
     "lint": "eslint \"./**/*.{ts,js}\"",
-    "build-tests": "esbuild test/index.ts --bundle --keep-names > test/test-bundle.js",
-    "test": "npm run build && npm run build-tests && node ./test/test-bundle.js",
+    "build-tests": "esbuild test/index.ts --platform=node --bundle --keep-names > test/test-bundle.js",
+    "test": "npm run build-tests && node ./test/test-bundle.js",
     "test:extension": "esbuild test/extension.ts --platform=node --bundle --keep-names | node",
     "test:no-timeout": "esbuild test/no-timeout.ts --platform=node --bundle --keep-names | node",
     "test:protocol": "esbuild ./test/protocol.ts --platform=node --bundle --keep-names | node",
