@@ -152,7 +152,8 @@ export class Wire extends Duplex<any> {
     _timeoutExpiresAt
     _finished:boolean
     _parserSize:number  // number of needed bytes to parse next message from remote peer
-    _parser  // function to call once `this._parserSize` bytes are available
+    // function to call once `this._parserSize` bytes are available
+    _parser:((buf:Uint8Array)=>void)|null|undefined
     _buffer  // incomplete message data
     _bufferSize:number  // cached total length of buffers in `this._buffer`
     _peEnabled:boolean
@@ -233,9 +234,6 @@ export class Wire extends Duplex<any> {
             // crypto object used to generate keys/secret
             this._dh = dh.createDiffieHellman(DH_PRIME, 'hex', DH_GENERATOR)
             this._myPubKey = this._dh!.generateKeys('hex')  // my DH public key
-            // this._dh = await createDhKeypair()
-            // this._myPubKey = this._dh.generateKeys('hex')
-            // this._myPubKey = dhKeys.hex
         } else {
             this._myPubKey = null
         }
@@ -1209,9 +1207,9 @@ export class Wire extends Duplex<any> {
    * Once enough bytes have arrived to process the message, the callback function
    * (i.e. `this._parser`) gets called with the full buffer of data.
    * @param  {Uint8Array} data
-   * @param  {function} cb
+   * @param  {(null):void} cb Signal that we're ready for more data
    */
-    _write (data, cb) {
+    _write (data:Uint8Array, cb):void {
         if (this._encryptionMethod === 2 && this._cryptoHandshakeDone) {
             data = this._decrypt(data)
         }
@@ -1236,7 +1234,7 @@ export class Wire extends Duplex<any> {
 
         while (this._bufferSize >= this._parserSize && !this._cryptoSyncPattern) {
             if (this._parserSize === 0) {
-                this._parser(new Uint8Array())
+                this._parser!(new Uint8Array())
             } else {
                 const buffer = this._buffer[0]
                 // console.log('buffer:', this._buffer)
@@ -1244,11 +1242,11 @@ export class Wire extends Duplex<any> {
                 this._buffer = this._bufferSize
                     ? [buffer.slice(this._parserSize)]
                     : []
-                this._parser(buffer.slice(0, this._parserSize))
+                this._parser!(buffer.slice(0, this._parserSize))
             }
         }
 
-        cb(null) // Signal that we're ready for more data
+        cb(null)  // Signal that we're ready for more data
     }
 
     _callback (request, err, buffer) {
@@ -1283,13 +1281,14 @@ export class Wire extends Duplex<any> {
     }
 
     /**
-   * Takes a number of bytes that the local peer is waiting to receive from the remote peer
-   * in order to parse a complete message, and a callback function to be called once enough
-   * bytes have arrived.
-   * @param  {number} size
-   * @param  {function} parser
-   */
-    _parse (size:number, parser?:(any)=>any) {
+     * Takes a number of bytes that the local peer is waiting to receive from
+     *   the remote peer.
+     * In order to parse a complete message, add a callback function to be
+     *   called once enough bytes have arrived.
+     * @param  {number} size
+     * @param  {function} parser
+     */
+    _parse (size:number, parser?:(buf:Uint8Array)=>void) {
         this._parserSize = size
         this._parser = parser
     }
@@ -1300,12 +1299,17 @@ export class Wire extends Duplex<any> {
     }
 
     /**
-   * Handle the first 4 bytes of a message, to determine the length of bytes that must be
-   * waited for in order to have the whole message.
-   * @param  {Uint8Array} buffer
-   */
-    _onMessageLength (buffer) {
-        const length = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getUint32(0)
+     * Handle the first 4 bytes of a message, to determine the length of bytes
+     * that must be waited for in order to have the whole message.
+     * @param  {Uint8Array} buffer
+     */
+    _onMessageLength (buffer:Uint8Array):void {
+        const length = new DataView(
+            buffer.buffer,
+            buffer.byteOffset,
+            buffer.byteLength
+        ).getUint32(0)
+
         if (length > 0) {
             this._parse(length, this._onMessage)
         } else {
@@ -1315,10 +1319,10 @@ export class Wire extends Duplex<any> {
     }
 
     /**
-   * Handle a message from the remote peer.
-   * @param  {Uint8Array} buffer
-   */
-    _onMessage (buffer) {
+     * Handle a message from the remote peer.
+     * @param  {Uint8Array} buffer
+     */
+    _onMessage (buffer:Uint8Array):void {
         this._parse(4, this._onMessageLength)
         const view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength)
         switch (buffer[0]) {
@@ -1407,7 +1411,10 @@ export class Wire extends Duplex<any> {
 
     // Handles the unencrypted portion of step 4
     async _parsePe3 () {
-        const hash1Buffer = await hash(hex2arr(this._utfToHex('req1') + this._sharedSecret))
+        const hash1Buffer = await hash(
+            hex2arr(this._utfToHex('req1') + this._sharedSecret)
+        )
+
         // synchronize on HASH('req1', S)
         this._parseUntil(hash1Buffer, 512)
         this._parse(20, buffer => {
@@ -1438,7 +1445,13 @@ export class Wire extends Duplex<any> {
                         )
                         const pstrlen = iaLen ? iaBuffer[0] : null
                         const protocol = iaLen ? iaBuffer.slice(1, 20) : null
-                        if (pstrlen === 19 && arr2text(protocol) === 'BitTorrent protocol') {
+
+                        if (!protocol) throw new Error('Not protocol')
+
+                        if (
+                            pstrlen === 19 &&
+                            arr2text(protocol) === 'BitTorrent protocol'
+                        ) {
                             this._onHandshakeBuffer(iaBuffer.slice(1))
                         } else {
                             this._parseHandshake()
