@@ -1,6 +1,7 @@
 import bencode from '@substrate-system/bencode'
 import BitField from '@substrate-system/bitfield'
-import { webcrypto } from '@bicycle-codes/one-webcrypto'
+import dh from 'diffie-hellman'
+// import { webcrypto } from '@bicycle-codes/one-webcrypto'
 import RC4 from 'rc4'
 import {
     Duplex,
@@ -25,6 +26,8 @@ const debug = Debug('bittorrent-protocol')
 const BITFIELD_GROW = 400000
 const KEEP_ALIVE_TIMEOUT = 55000
 const ALLOWED_FAST_SET_MAX_LENGTH = 100
+const DH_PRIME = 'ffffffffffffffffc90fdaa22168c234c4c6628b80dc1cd129024e088a67cc74020bbea63b139b22514a08798e3404ddef9519b3cd3a431b302b0a6df25f14374fe1356d6d51c245e485b576625e7ec6f44c42e9a63a36210000000000090563'
+const DH_GENERATOR = 2
 
 const MESSAGE_PROTOCOL = text2arr('\u0013BitTorrent protocol')
 const MESSAGE_KEEP_ALIVE = new Uint8Array([0x00, 0x00, 0x00, 0x00])
@@ -111,7 +114,8 @@ export class Wire extends Duplex<any> {
     readonly peerExtendedMapping:Record<string, number>
     amChoking:boolean
     amInterested:boolean
-    _dhKeys:{ keys:CryptoKeyPair, hex, spki }
+    _dh:any|null = null
+    // _dhKeys:{ keys:CryptoKeyPair, hex, spki }
     _myPubKey:null|string
     _setGenerators:boolean
     _decryptGenerator
@@ -148,7 +152,8 @@ export class Wire extends Duplex<any> {
     _timeoutExpiresAt
     _finished:boolean
     _parserSize:number  // number of needed bytes to parse next message from remote peer
-    _parser  // function to call once `this._parserSize` bytes are available
+    // function to call once `this._parserSize` bytes are available
+    _parser:((buf:Uint8Array)=>void)|null|undefined
     _buffer  // incomplete message data
     _bufferSize:number  // cached total length of buffers in `this._buffer`
     _peEnabled:boolean
@@ -162,7 +167,6 @@ export class Wire extends Duplex<any> {
     _extendedHandshakeSent?:boolean
 
     constructor (
-        dhKeys:{ keys:CryptoKeyPair, hex:string, spki:ArrayBuffer },
         type = null,
         retries = 0,
         peEnabled = false,
@@ -228,10 +232,8 @@ export class Wire extends Duplex<any> {
         this._peEnabled = peEnabled
         if (peEnabled) {
             // crypto object used to generate keys/secret
-            // this._dh = crypto.createDiffieHellman(DH_PRIME, 'hex', DH_GENERATOR)
-            // this._dh = await createDhKeypair()
-            // this._myPubKey = this._dh.generateKeys('hex')  // my DH public key
-            this._myPubKey = dhKeys.hex
+            this._dh = dh.createDiffieHellman(DH_PRIME, 'hex', DH_GENERATOR)
+            this._myPubKey = this._dh!.generateKeys('hex')  // my DH public key
         } else {
             this._myPubKey = null
         }
@@ -240,7 +242,7 @@ export class Wire extends Duplex<any> {
         this._peerCryptoProvide = [] // encryption methods provided by peer; we expect this to always contain 0x02
         this._cryptoHandshakeDone = false
 
-        this._dhKeys = dhKeys
+        // this._dhKeys = dhKeys
         this._cryptoSyncPattern = null // the pattern to search for when resynchronizing after receiving pe1/pe2
         this._waitMaxBytes = null // the maximum number of bytes resynchronization must occur within
         this._encryptionMethod = null // 1 for plaintext, 2 for RC4
@@ -272,8 +274,8 @@ export class Wire extends Duplex<any> {
         retries = 0,
         peEnabled = false
     ):Promise<InstanceType<typeof Wire>> {
-        const dhKeys = await createDhKeypair()
-        const wire = new Wire(dhKeys, type, retries, peEnabled)
+        // const dhKeys = await createDhKeypair()
+        const wire = new Wire(type, retries, peEnabled)
         return wire
     }
 
@@ -885,34 +887,24 @@ export class Wire extends Duplex<any> {
         this.emit('keep-alive')
     }
 
-    async _onPe1 (pubKeyBuffer) {
+    _onPe1 (pubKeyBuffer) {
         this._peerPubKey = arr2hex(pubKeyBuffer)
-        // this._sharedSecret = this._dh.computeSecret(this._peerPubKey, 'hex', 'hex')
-        const secret = await computeSharedSecret(
-            this._dhKeys.keys.privateKey,
-            this._peerPubKey
-        )
-        this._sharedSecret = arr2hex(new Uint8Array(secret))
+        this._sharedSecret = this._dh.computeSecret(this._peerPubKey, 'hex', 'hex')
         // @ts-expect-error @TDOD extend events
         this.emit('pe1')
     }
 
-    async _onPe2 (pubKeyBuffer) {
+    _onPe2 (pubKeyBuffer) {
         this._peerPubKey = arr2hex(pubKeyBuffer)
-        const secret = await computeSharedSecret(
-            this._dhKeys.keys.privateKey,
-            this._peerPubKey
-        )
-        this._sharedSecret = arr2hex(new Uint8Array(secret))
-        // this._sharedSecret = this._dh.computeSecret(this._peerPubKey, 'hex', 'hex')
-        // @ts-expect-error @TDOD extend events
+        this._sharedSecret = this._dh.computeSecret(this._peerPubKey, 'hex', 'hex')
+        // @ts-expect-error @TODO events
         this.emit('pe2')
     }
 
     async _onPe3 (hashesXorBuffer:Uint8Array) {
-        const hash3 = hex2arr(this._utfToHex('req3') + this._sharedSecret)
+        const hash3 = await hex2arr(this._utfToHex('req3') + this._sharedSecret)
         const sKeyHash = arr2hex(xor(hash3, hashesXorBuffer))
-        // @ts-expect-error @TDOD extend events
+        // @ts-expect-error events
         this.emit('pe3', sKeyHash)
     }
 
@@ -1215,9 +1207,9 @@ export class Wire extends Duplex<any> {
    * Once enough bytes have arrived to process the message, the callback function
    * (i.e. `this._parser`) gets called with the full buffer of data.
    * @param  {Uint8Array} data
-   * @param  {function} cb
+   * @param  {(null):void} cb Signal that we're ready for more data
    */
-    _write (data, cb) {
+    _write (data:Uint8Array, cb):void {
         if (this._encryptionMethod === 2 && this._cryptoHandshakeDone) {
             data = this._decrypt(data)
         }
@@ -1242,7 +1234,7 @@ export class Wire extends Duplex<any> {
 
         while (this._bufferSize >= this._parserSize && !this._cryptoSyncPattern) {
             if (this._parserSize === 0) {
-                this._parser(new Uint8Array())
+                this._parser!(new Uint8Array())
             } else {
                 const buffer = this._buffer[0]
                 // console.log('buffer:', this._buffer)
@@ -1250,11 +1242,11 @@ export class Wire extends Duplex<any> {
                 this._buffer = this._bufferSize
                     ? [buffer.slice(this._parserSize)]
                     : []
-                this._parser(buffer.slice(0, this._parserSize))
+                this._parser!(buffer.slice(0, this._parserSize))
             }
         }
 
-        cb(null) // Signal that we're ready for more data
+        cb(null)  // Signal that we're ready for more data
     }
 
     _callback (request, err, buffer) {
@@ -1289,13 +1281,14 @@ export class Wire extends Duplex<any> {
     }
 
     /**
-   * Takes a number of bytes that the local peer is waiting to receive from the remote peer
-   * in order to parse a complete message, and a callback function to be called once enough
-   * bytes have arrived.
-   * @param  {number} size
-   * @param  {function} parser
-   */
-    _parse (size:number, parser?:(any)=>any) {
+     * Takes a number of bytes that the local peer is waiting to receive from
+     *   the remote peer.
+     * In order to parse a complete message, add a callback function to be
+     *   called once enough bytes have arrived.
+     * @param  {number} size
+     * @param  {function} parser
+     */
+    _parse (size:number, parser?:(buf:Uint8Array)=>void) {
         this._parserSize = size
         this._parser = parser
     }
@@ -1306,12 +1299,17 @@ export class Wire extends Duplex<any> {
     }
 
     /**
-   * Handle the first 4 bytes of a message, to determine the length of bytes that must be
-   * waited for in order to have the whole message.
-   * @param  {Uint8Array} buffer
-   */
-    _onMessageLength (buffer) {
-        const length = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength).getUint32(0)
+     * Handle the first 4 bytes of a message, to determine the length of bytes
+     * that must be waited for in order to have the whole message.
+     * @param  {Uint8Array} buffer
+     */
+    _onMessageLength (buffer:Uint8Array):void {
+        const length = new DataView(
+            buffer.buffer,
+            buffer.byteOffset,
+            buffer.byteLength
+        ).getUint32(0)
+
         if (length > 0) {
             this._parse(length, this._onMessage)
         } else {
@@ -1321,10 +1319,10 @@ export class Wire extends Duplex<any> {
     }
 
     /**
-   * Handle a message from the remote peer.
-   * @param  {Uint8Array} buffer
-   */
-    _onMessage (buffer) {
+     * Handle a message from the remote peer.
+     * @param  {Uint8Array} buffer
+     */
+    _onMessage (buffer:Uint8Array):void {
         this._parse(4, this._onMessageLength)
         const view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength)
         switch (buffer[0]) {
@@ -1413,7 +1411,10 @@ export class Wire extends Duplex<any> {
 
     // Handles the unencrypted portion of step 4
     async _parsePe3 () {
-        const hash1Buffer = await hash(hex2arr(this._utfToHex('req1') + this._sharedSecret))
+        const hash1Buffer = await hash(
+            hex2arr(this._utfToHex('req1') + this._sharedSecret)
+        )
+
         // synchronize on HASH('req1', S)
         this._parseUntil(hash1Buffer, 512)
         this._parse(20, buffer => {
@@ -1444,7 +1445,13 @@ export class Wire extends Duplex<any> {
                         )
                         const pstrlen = iaLen ? iaBuffer[0] : null
                         const protocol = iaLen ? iaBuffer.slice(1, 20) : null
-                        if (pstrlen === 19 && arr2text(protocol) === 'BitTorrent protocol') {
+
+                        if (!protocol) throw new Error('Not protocol')
+
+                        if (
+                            pstrlen === 19 &&
+                            arr2text(protocol) === 'BitTorrent protocol'
+                        ) {
                             this._onHandshakeBuffer(iaBuffer.slice(1))
                         } else {
                             this._parseHandshake()
@@ -1604,47 +1611,47 @@ export class Wire extends Duplex<any> {
 
 export default Wire
 
-async function computeSharedSecret (
-    privKey:CryptoKey,
-    pubKey:ArrayBuffer
-):Promise<ArrayBuffer> {
-    const publicKey = await webcrypto.subtle.importKey(
-        'spki',
-        pubKey,
-        'ECDH',
-        true,
-        ['deriveBits']
-    )
+// async function computeSharedSecret (
+//     privKey:CryptoKey,
+//     pubKey:ArrayBuffer
+// ):Promise<ArrayBuffer> {
+//     const publicKey = await webcrypto.subtle.importKey(
+//         'spki',
+//         pubKey,
+//         'ECDH',
+//         true,
+//         ['deriveBits']
+//     )
 
-    // Alice derives the shared secret using Bob's public key
-    const sharedSecret = await window.crypto.subtle.deriveBits(
-        {
-            name: 'ECDH',
-            public: publicKey
-            // public: await webcrypto.subtle.exportKey('spki', bobKeyPair.publicKey)
-        },
-        privKey,
-        256  // The desired length of the shared secret in bits
-    )
+//     // Alice derives the shared secret using Bob's public key
+//     const sharedSecret = await window.crypto.subtle.deriveBits(
+//         {
+//             name: 'ECDH',
+//             public: publicKey
+//             // public: await webcrypto.subtle.exportKey('spki', bobKeyPair.publicKey)
+//         },
+//         privKey,
+//         256  // The desired length of the shared secret in bits
+//     )
 
-    return sharedSecret
-}
+//     return sharedSecret
+// }
 
-async function createDhKeypair ():Promise<{
-    keys:CryptoKeyPair;
-    hex:string;
-    spki:ArrayBuffer;
-}> {
-    const keys = await webcrypto.subtle.generateKey({
-        name: 'ECDH',
-        namedCurve: 'P-256',
-    }, true, ['deriveKey'])
+// async function createDhKeypair ():Promise<{
+//     keys:CryptoKeyPair;
+//     hex:string;
+//     spki:ArrayBuffer;
+// }> {
+//     const keys = await webcrypto.subtle.generateKey({
+//         name: 'ECDH',
+//         namedCurve: 'P-256',
+//     }, true, ['deriveKey'])
 
-    const publicKey = await webcrypto.subtle.exportKey('spki', keys.publicKey)
-    const hex = arr2hex(new Uint8Array(publicKey))
+//     const publicKey = await webcrypto.subtle.exportKey('spki', keys.publicKey)
+//     const hex = arr2hex(new Uint8Array(publicKey))
 
-    return { keys, hex, spki: publicKey }
-}
+//     return { keys, hex, spki: publicKey }
+// }
 
 function xor (a:Uint8Array, b:Uint8Array):Uint8Array {
     for (let len = a.length; len--;) {
