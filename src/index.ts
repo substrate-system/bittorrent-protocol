@@ -1,7 +1,6 @@
 import bencode from '@substrate-system/bencode'
 import BitField from '@substrate-system/bitfield'
 import dh from 'diffie-hellman'
-// import { webcrypto } from '@bicycle-codes/one-webcrypto'
 import RC4 from 'rc4'
 import {
     Duplex,

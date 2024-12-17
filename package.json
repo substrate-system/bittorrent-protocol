@@ -33,7 +33,6 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@bicycle-codes/one-webcrypto": "^1.1.2",
     "@substrate-system/bencode": "^4.0.0",
     "@substrate-system/bitfield": "^4.2.2",
     "@substrate-system/esbuild-plugin-polyfill-node": "^0.3.1",
