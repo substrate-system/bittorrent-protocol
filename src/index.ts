@@ -166,7 +166,8 @@ export class Wire extends Duplex<any> {
     _extendedHandshakeSent?:boolean
 
     constructor (
-        type = null,
+        type:'webrtc'|'tcpIncoming'|'tcpOutgoing'|'webSeed'|null,
+        // type:string|null = null,
         retries = 0,
         peEnabled = false,
     ) {
@@ -1609,48 +1610,6 @@ export class Wire extends Duplex<any> {
 }
 
 export default Wire
-
-// async function computeSharedSecret (
-//     privKey:CryptoKey,
-//     pubKey:ArrayBuffer
-// ):Promise<ArrayBuffer> {
-//     const publicKey = await webcrypto.subtle.importKey(
-//         'spki',
-//         pubKey,
-//         'ECDH',
-//         true,
-//         ['deriveBits']
-//     )
-
-//     // Alice derives the shared secret using Bob's public key
-//     const sharedSecret = await window.crypto.subtle.deriveBits(
-//         {
-//             name: 'ECDH',
-//             public: publicKey
-//             // public: await webcrypto.subtle.exportKey('spki', bobKeyPair.publicKey)
-//         },
-//         privKey,
-//         256  // The desired length of the shared secret in bits
-//     )
-
-//     return sharedSecret
-// }
-
-// async function createDhKeypair ():Promise<{
-//     keys:CryptoKeyPair;
-//     hex:string;
-//     spki:ArrayBuffer;
-// }> {
-//     const keys = await webcrypto.subtle.generateKey({
-//         name: 'ECDH',
-//         namedCurve: 'P-256',
-//     }, true, ['deriveKey'])
-
-//     const publicKey = await webcrypto.subtle.exportKey('spki', keys.publicKey)
-//     const hex = arr2hex(new Uint8Array(publicKey))
-
-//     return { keys, hex, spki: publicKey }
-// }
 
 function xor (a:Uint8Array, b:Uint8Array):Uint8Array {
     for (let len = a.length; len--;) {
