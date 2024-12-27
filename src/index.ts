@@ -4,6 +4,7 @@ import dh from 'diffie-hellman'
 import RC4 from 'rc4'
 import {
     Duplex,
+    type DuplexEvents,
     // type DuplexEvents,
     type StreamEvents,
     // type WritableEvents
@@ -358,6 +359,10 @@ export class Wire extends Duplex<any> {
     ):boolean {
         // @ts-expect-error ???
         return super.emit(evName, ...rest)
+    }
+
+    removeListener<TEvent extends keyof StreamEvents|'piping'|'readable'|'data'|'end'|'pipe'|'finish'|'drain'> (event:TEvent, listener: TEvent extends keyof StreamEvents|'piping'|'readable'|'data'|'end'|'pipe'|'finish'|'drain' ? DuplexEvents<any, any>[TEvent]:(...args:any[])=>void):this {
+        return super.removeListener(event, listener)
     }
 
     /**
