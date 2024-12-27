@@ -289,7 +289,8 @@ export class Wire extends Duplex<any> {
     once (event:'bitfield', listener:(bitfield:any)=>void):this;
     once (
         event:('keep-alive'|'choke'|'unchoke'|'interested'|
-            'uninterested'|'timeout'|'have-all'|'have-none'),
+            'uninterested'|'timeout'|'have-all'|'have-none'|
+            'end'|'close'|'finish'|'error'|'pe1'|'pe2'|'pe3'|'pe4'),
         listener:()=>void,
     ):this;
 
