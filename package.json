@@ -2,7 +2,7 @@
   "name": "@substrate-system/bittorrent-protocol",
   "type": "module",
   "description": "Simple, robust, BitTorrent peer wire protocol implementation",
-  "version": "4.2.5",
+  "version": "4.2.6",
   "files": [
     "./dist/*"
   ],
