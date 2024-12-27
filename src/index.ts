@@ -4,8 +4,9 @@ import dh from 'diffie-hellman'
 import RC4 from 'rc4'
 import {
     Duplex,
+    // type DuplexEvents,
     type StreamEvents,
-    type WritableEvents
+    // type WritableEvents
 } from 'streamx'
 import {
     hash,
@@ -76,15 +77,17 @@ class HaveAllBitField {
     set (_index?:number) {}
 }
 
-export type ProtocolEvents = StreamEvents & WritableEvents<any> & {
+// export type ProtocolEvents = StreamEvents & DuplexEvents<any, any> & {
+export type ProtocolEvents = StreamEvents & {
     'upload':(data:any)=>void;
-    'new-item':(item:string) => void;
-    'item-updated':(item:string, newValue:number) => void;
+    'new-item':(item:string)=>void;
+    'item-updated':(item:string, newValue:number)=>void;
     'finish':(item:any)=>void;
     'piping':(data:any)=>any;
     'handshake':(data:any)=>any;
     'unchoke':()=>any;
     'have-all':()=>void;
+    'end':()=>void;
 }
 
 export interface Ext {
@@ -254,8 +257,9 @@ export class Wire extends Duplex<any> {
         this._debug('type:', this.type)
 
         if (this.type === 'tcpIncoming' && this._peEnabled) {
-            // If we are not the initiator, we should wait to see if the client begins
-            // with PE/MSE handshake or the standard bittorrent handshake.
+            // If we are not the initiator, we should wait to see if the client
+            // begins with PE/MSE handshake or the standard
+            // bittorrent handshake.
             this._determineHandshakeType()
         } else if (this.type === 'tcpOutgoing' && this._peEnabled && retries === 0) {
             this._parsePe2()
@@ -273,11 +277,14 @@ export class Wire extends Duplex<any> {
         type = null,
         retries = 0,
         peEnabled = false
-    ):Promise<InstanceType<typeof Wire>> {
-        // const dhKeys = await createDhKeypair()
+    ):Promise<Wire> {
         const wire = new Wire(type, retries, peEnabled)
         return wire
     }
+
+    //  Argument of type '"end"' is not assignable to parameter of type
+    // '"keep-alive" | "choke" | "unchoke" | "interested" | "uninterested" |
+    // "timeout" | "have-all" | "have-none"'.
 
     once (event:'bitfield', listener:(bitfield:any)=>void):this;
     once (
@@ -306,6 +313,9 @@ export class Wire extends Duplex<any> {
 
     on (event:'suggest', listener: (index:number)=>void):this;
     on (event:'bitfield', listener:(bitfield:any)=>void):this;
+    //  Argument of type '"end"' is not assignable to parameter of type
+    // '"keep-alive" | "choke" | "unchoke" | "interested" | "uninterested" |
+    // "timeout" | "have-all" | "have-none"'.
     on (
         event:('keep-alive'|'choke'|'unchoke'|'interested'|
             'uninterested'|'timeout'|'have-all'|'have-none'),
