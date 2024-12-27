@@ -290,10 +290,11 @@ export class Wire extends Duplex<any> {
     once (
         event:('keep-alive'|'choke'|'unchoke'|'interested'|
             'uninterested'|'timeout'|'have-all'|'have-none'|
-            'end'|'close'|'finish'|'error'|'pe1'|'pe2'|'pe3'|'pe4'),
+            'end'|'close'|'finish'|'pe1'|'pe2'|'pe3'|'pe4'),
         listener:()=>void,
     ):this;
 
+    once (event:'error', listener:(err:Error)=>void):this;
     once (event:'suggest', listener: (index:number)=>void):this;
     once (event:'piece', listener: (index:number, offset:number, buffer:Buffer)=>void):this;
     once (event:'cancel', listener:(index:number, offset:number, length:number)=>void):this;
