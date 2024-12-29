@@ -1218,14 +1218,14 @@ export class Wire extends Duplex<any> {
     }
 
     /**
-   * Duplex stream method. Called whenever the remote peer has data for us. Data that the
-   * remote peer sends gets buffered (i.e. not actually processed) until the right number
-   * of bytes have arrived, determined by the last call to `this._parse(number, callback)`.
-   * Once enough bytes have arrived to process the message, the callback function
-   * (i.e. `this._parser`) gets called with the full buffer of data.
-   * @param  {Uint8Array} data
-   * @param  {(null):void} cb Signal that we're ready for more data
-   */
+     * Duplex stream method. Called whenever the remote peer has data for us. Data that the
+     * remote peer sends gets buffered (i.e. not actually processed) until the right number
+     * of bytes have arrived, determined by the last call to `this._parse(number, callback)`.
+     * Once enough bytes have arrived to process the message, the callback function
+     * (i.e. `this._parser`) gets called with the full buffer of data.
+     * @param  {Uint8Array} data
+     * @param  {(null):void} cb Signal that we're ready for more data
+     */
     _write (data:Uint8Array, cb):void {
         if (this._encryptionMethod === 2 && this._cryptoHandshakeDone) {
             data = this._decrypt(data)
