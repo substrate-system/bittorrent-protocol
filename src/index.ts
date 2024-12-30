@@ -366,9 +366,9 @@ export class Wire extends Duplex<any> {
     }
 
     /**
-   * Set whether to send a "keep-alive" ping (sent every 55s)
-   * @param {boolean} enable
-   */
+     * Set whether to send a "keep-alive" ping (sent every 55s)
+     * @param {boolean} enable
+     */
     setKeepAlive (enable:boolean):void {
         this._debug('setKeepAlive %s', enable)
         clearInterval(this._keepAliveInterval)
@@ -379,10 +379,10 @@ export class Wire extends Duplex<any> {
     }
 
     /**
-   * Set the amount of time to wait before considering a request to be "timed out"
-   * @param {number} ms
-   * @param {boolean=} unref (should the timer be unref'd? default: false)
-   */
+     * Set the amount of time to wait before considering a request to be "timed out"
+     * @param {number} ms
+     * @param {boolean=} unref (should the timer be unref'd? default: false)
+     */
     setTimeout (ms:number, unref?:boolean):void {
         this._debug('setTimeout ms=%d unref=%s', ms, unref)
         this._timeoutMs = ms
@@ -597,8 +597,8 @@ export class Wire extends Duplex<any> {
     }
 
     /**
-   * Message "choke": <len=0001><id=0>
-   */
+     * Message "choke": <len=0001><id=0>
+     */
     choke () {
         if (this.amChoking) return
         this.amChoking = true
@@ -625,8 +625,8 @@ export class Wire extends Duplex<any> {
     }
 
     /**
-   * Message "unchoke": <len=0001><id=1>
-   */
+     * Message "unchoke": <len=0001><id=1>
+     */
     unchoke () {
         if (!this.amChoking) return
         this.amChoking = false
@@ -635,8 +635,8 @@ export class Wire extends Duplex<any> {
     }
 
     /**
-   * Message "interested": <len=0001><id=2>
-   */
+     * Message "interested": <len=0001><id=2>
+     */
     interested () {
         if (this.amInterested) return
         this.amInterested = true
@@ -655,18 +655,18 @@ export class Wire extends Duplex<any> {
     }
 
     /**
-   * Message "have": <len=0005><id=4><piece index>
-   * @param  {number} index
-   */
+     * Message "have": <len=0005><id=4><piece index>
+     * @param  {number} index
+     */
     have (index:number):void {
         this._debug('have %d', index)
         this._message(4, [index], null)
     }
 
     /**
-   * Message "bitfield": <len=0001+X><id=5><bitfield>
-   * @param  {BitField|Buffer} bitfield
-   */
+     * Message "bitfield": <len=0001+X><id=5><bitfield>
+     * @param  {BitField|Buffer} bitfield
+     */
     bitfield (bitfield) {
         this._debug('bitfield')
         if (!ArrayBuffer.isView(bitfield)) bitfield = bitfield.buffer
@@ -674,12 +674,12 @@ export class Wire extends Duplex<any> {
     }
 
     /**
-   * Message "request": <len=0013><id=6><index><begin><length>
-   * @param  {number}   index
-   * @param  {number}   offset
-   * @param  {number}   length
-   * @param  {function} cb
-   */
+     * Message "request": <len=0013><id=6><index><begin><length>
+     * @param  {number}   index
+     * @param  {number}   offset
+     * @param  {number}   length
+     * @param  {function} cb
+     */
     request (index, offset, length, cb) {
         if (!cb) cb = () => {}
         if (this._finished) return cb(new Error('wire is closed'))
@@ -713,11 +713,11 @@ export class Wire extends Duplex<any> {
     }
 
     /**
-   * Message "cancel": <len=0013><id=8><index><begin><length>
-   * @param  {number} index
-   * @param  {number} offset
-   * @param  {number} length
-   */
+     * Message "cancel": <len=0013><id=8><index><begin><length>
+     * @param  {number} index
+     * @param  {number} offset
+     * @param  {number} length
+     */
     cancel (index, offset, length) {
         this._debug('cancel index=%d offset=%d length=%d', index, offset, length)
         this._callback(
@@ -729,9 +729,9 @@ export class Wire extends Duplex<any> {
     }
 
     /**
-   * Message: "port" <len=0003><id=9><listen-port>
-   * @param {Number} port
-   */
+     * Message: "port" <len=0003><id=9><listen-port>
+     * @param {Number} port
+     */
     port (port) {
         this._debug('port %d', port)
         const message = new Uint8Array(MESSAGE_PORT)
@@ -741,9 +741,9 @@ export class Wire extends Duplex<any> {
     }
 
     /**
-   * Message: "suggest" <len=0x0005><id=0x0D><piece index> (BEP6)
-   * @param {number} index
-   */
+     * Message: "suggest" <len=0x0005><id=0x0D><piece index> (BEP6)
+     * @param {number} index
+     */
     suggest (index) {
         if (!this.hasFast) throw Error('fast extension is disabled')
         this._debug('suggest %d', index)
@@ -751,8 +751,8 @@ export class Wire extends Duplex<any> {
     }
 
     /**
-   * Message: "have-all" <len=0x0001><id=0x0E> (BEP6)
-   */
+     * Message: "have-all" <len=0x0001><id=0x0E> (BEP6)
+     */
     haveAll () {
         if (!this.hasFast) throw Error('fast extension is disabled')
         this._debug('have-all')
@@ -760,8 +760,8 @@ export class Wire extends Duplex<any> {
     }
 
     /**
-   * Message: "have-none" <len=0x0001><id=0x0F> (BEP6)
-   */
+     * Message: "have-none" <len=0x0001><id=0x0F> (BEP6)
+     */
     haveNone () {
         if (!this.hasFast) throw Error('fast extension is disabled')
         this._debug('have-none')
@@ -769,11 +769,11 @@ export class Wire extends Duplex<any> {
     }
 
     /**
-   * Message "reject": <len=0x000D><id=0x10><index><offset><length> (BEP6)
-   * @param  {number}   index
-   * @param  {number}   offset
-   * @param  {number}   length
-   */
+     * Message "reject": <len=0x000D><id=0x10><index><offset><length> (BEP6)
+     * @param  {number}   index
+     * @param  {number}   offset
+     * @param  {number}   length
+     */
     reject (index, offset, length) {
         if (!this.hasFast) throw Error('fast extension is disabled')
         this._debug('reject index=%d offset=%d length=%d', index, offset, length)
@@ -813,13 +813,13 @@ export class Wire extends Duplex<any> {
     }
 
     /**
-   * Sets the encryption method for this wire, as per PSE/ME specification
-   *
-   * @param {string} sharedSecret:  A hex-encoded string, which is the shared secret agreed
-   *                                upon from DH key exchange
-   * @param {string} infoHash:  A hex-encoded info hash
-   * @returns boolean, true if encryption setting succeeds, false if it fails.
-   */
+     * Sets the encryption method for this wire, as per PSE/ME specification
+     *
+     * @param {string} sharedSecret:  A hex-encoded string, which is the shared secret agreed
+     *                                upon from DH key exchange
+     * @param {string} infoHash:  A hex-encoded info hash
+     * @returns boolean, true if encryption setting succeeds, false if it fails.
+     */
     async setEncrypt (sharedSecret, infoHash) {
         let encryptKeyBuf
         let encryptKeyIntArray
@@ -869,8 +869,8 @@ export class Wire extends Duplex<any> {
     }
 
     /**
-   * Send a message to the remote peer.
-   */
+     * Send a message to the remote peer.
+     */
     _message (id, numbers, data) {
         const dataLength = data ? data.length : 0
         const buffer = new Uint8Array(5 + (4 * numbers.length))
