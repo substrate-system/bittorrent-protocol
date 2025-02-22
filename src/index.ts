@@ -80,7 +80,7 @@ class HaveAllBitField {
 
 export type WireType = 'webrtc'|'tcpIncoming'|'tcpOutgoing'|'webSeed'|null;
 
-interface ProtocolEvents {
+interface ProtocolEvents extends StreamEvents {
     'bitfield': (bitfield: any) => void;
     'keep-alive': () => void;
     'choke': () => void;
@@ -108,7 +108,11 @@ interface ProtocolEvents {
         peerId: string,
         extensions: { extended: boolean; fast: boolean }
     ) => void;
-    // Add other events as needed
+    'piping': () => void;
+    'readable': () => void;
+    'data': (chunk: any) => void;
+    'pipe': () => void;
+    'drain': () => void;
 }
 
 // interface ProtocolEvents {
@@ -490,82 +494,46 @@ export class Wire extends Duplex<any> {
     // '"keep-alive" | "choke" | "unchoke" | "interested" | "uninterested" |
     // "timeout" | "have-all" | "have-none"'.
 
-    // once (event:'bitfield', listener:(bitfield:any)=>void):this;
-    // once (
-    //     event:('keep-alive'|'choke'|'unchoke'|'interested'|
-    //         'uninterested'|'timeout'|'have-all'|'have-none'|
-    //         'end'|'close'|'finish'|'pe1'|'pe2'|'pe3'|'pe4'),
-    //     listener:()=>void,
-    // ):this;
+    once<TEvent extends keyof StreamEvents | 'piping' | 'readable' | 'data' | 'end' | 'pipe' | 'finish' | 'drain'>(
+        event: TEvent,
+        listener: TEvent extends keyof StreamEvents | 'piping' | 'readable' | 'data' | 'end' | 'pipe' | 'finish' | 'drain'
+            ? DuplexEvents<any, any>[TEvent]
+            : (...args: any[]) => void
+    ): this;
 
-    // once (event:'error', listener:(err:Error)=>void):this;
-    // once (event:'suggest', listener: (index:number)=>void):this;
-    // once (event:'piece', listener: (index:number, offset:number, buffer:Buffer)=>void):this;
-    // once (event:'cancel', listener:(index:number, offset:number, length:number)=>void):this;
-    // once (event:'extended', listener: (ext:'handshake'|string, buf:any)=>void):void;
-    // once (event:'unknownmessage', listener:(buffer:Buffer)=>void):this;
-    // once (event:'handshake', listener:(
-    //     infoHash:string,
-    //     peerId:string,
-    //     extensions:{ extended:boolean, fast:boolean }
-    // )=>void):this;
-
-    once<K extends keyof ProtocolEvents & keyof StreamEvents> (
-        event:K,
-        listener:ProtocolEvents[K]|StreamEvents[K]|DuplexEvents<any, any>[K]
-        // listener:ProtocolEvents[K]
-    ):this {
-        return super.once(event, listener)
-    }
-
-    on<K extends keyof ProtocolEvents> (
-        event: K,
-        listener: ProtocolEvents[K]
+    once<TEvent extends keyof ProtocolEvents> (
+        event: TEvent,
+        listener: ProtocolEvents[TEvent]
     ): this {
-        return super.on(event, listener)
+        return super.once(event as any, listener as any)
     }
 
-    // on (event:'suggest', listener: (index:number)=>void):this;
-    // on (event:'bitfield', listener:(bitfield:any)=>void):this;
-    // on (
-    //     event:('keep-alive'|'choke'|'unchoke'|'interested'|
-    //         'uninterested'|'timeout'|'have-all'|'have-none'),
-    //     listener:()=>void,
-    // ):this;
+    on<TEvent extends keyof StreamEvents | 'piping' | 'readable' | 'data' | 'end' | 'pipe' | 'finish' | 'drain'> (
+        event: TEvent,
+        listener: TEvent extends keyof StreamEvents | 'piping' | 'readable' | 'data' | 'end' | 'pipe' | 'finish' | 'drain'
+            ? DuplexEvents<any, any>[TEvent]
+            : (...args: any[]) => void
+    ): this;
 
-    // on (event:'upload'|'have'|'download'|'port', listener:(length:number)=>void):this;
-    // on (event:'handshake', listener:(
-    //     infoHash:string,
-    //     peerId:string,
-    //     extensions:{ extended:boolean, fast:boolean }
-    // )=>void):this;
+    on<TEvent extends keyof ProtocolEvents> (
+        event: TEvent,
+        listener: ProtocolEvents[TEvent]
+    ): this {
+        return super.on(event as any, listener as any)
+    }
 
-    // on (
-    //     event: 'request',
-    //     listener:(
-    //         index:number,
-    //         offset:number,
-    //         length:number,
-    //         respond:(err:Error|null, data?:any)=>void
-    //     )=>void,
-    // ):this;
+    emit<TEvent extends keyof StreamEvents | 'piping' | 'readable' | 'data' | 'end' | 'pipe' | 'finish' | 'drain'> (
+        event: TEvent,
+        ...rest: Parameters<TEvent extends keyof StreamEvents | 'piping' | 'readable' | 'data' | 'end' | 'pipe' | 'finish' | 'drain'
+            ? DuplexEvents<any, any>[TEvent]
+            : (...args: any[]) => void>
+    ): boolean;
 
-    // on (event:'piece', listener: (index:number, offset:number, buffer:Buffer)=>void):this;
-    // on (event:'cancel', listener:(index:number, offset:number, length:number)=>void):this;
-    // on (event:'extended', listener: (ext:'handshake'|string, buf:any)=>void):void;
-    // on (event:'unknownmessage', listener:(buffer:Buffer)=>void):this;
-    // on (event:string, listener:(...args:any[])=>void):this;
-
-    // on<K extends keyof ProtocolEvents> (ev:K, listener:ProtocolEvents[K]):this {
-    //     // @ts-expect-error ???
-    //     return super.on(ev, listener)
-    // }
-
-    emit<K extends keyof ProtocolEvents> (
-        evName:K & 'readable',
-        ...rest:any[]
-    ):boolean {
-        return super.emit(evName, ...rest)
+    emit<TEvent extends keyof ProtocolEvents> (
+        event: TEvent,
+        ...rest: Parameters<ProtocolEvents[TEvent]>
+    ): boolean {
+        return super.emit(event as any, ...rest)
     }
 
     removeListener<TEvent extends keyof StreamEvents|'piping'|'readable'|'data'|'end'|'pipe'|'finish'|'drain'> (event:TEvent, listener: TEvent extends keyof StreamEvents|'piping'|'readable'|'data'|'end'|'pipe'|'finish'|'drain' ? DuplexEvents<any, any>[TEvent]:(...args:any[])=>void):this {
