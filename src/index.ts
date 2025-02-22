@@ -78,7 +78,7 @@ class HaveAllBitField {
 
 export type WireType = 'webrtc'|'tcpIncoming'|'tcpOutgoing'|'webSeed'|null;
 
-interface ProtocolEvents extends StreamEvents {
+interface ProtocolEvents extends DuplexEvents<any, any> {
     'bitfield': (bitfield: any) => void;
     'keep-alive': () => void;
     'choke': () => void;
@@ -88,9 +88,6 @@ interface ProtocolEvents extends StreamEvents {
     'timeout': () => void;
     'have-all': () => void;
     'have-none': () => void;
-    'end': () => void;
-    'close': () => void;
-    'finish': () => void;
     'pe1': () => void;
     'pe2': () => void;
     'pe3': () => void;
@@ -310,40 +307,65 @@ export class Wire extends Duplex<any> {
         return wire
     }
 
-    once<TEvent extends keyof StreamEvents|'piping'|'readable'|'data'|'end'|
-        'pipe'|'finish'|'drain'|'keep-alive'>(
+    once<TEvent extends keyof StreamEvents> (
         event: TEvent,
-        listener: TEvent extends keyof StreamEvents | 'piping' | 'readable' | 'data' | 'end' | 'pipe' | 'finish' | 'drain'
+        listener: TEvent extends keyof StreamEvents
             ? DuplexEvents<any, any>[TEvent]
             : (...args: any[]) => void
-    ): this;
+    ):this;
 
     once<TEvent extends keyof ProtocolEvents> (
         event: TEvent,
         listener: ProtocolEvents[TEvent]
-    ): this {
+    ):this;
+
+    once (event: string, listener: (...args: any[]) => void):this {
         return super.once(event as any, listener as any)
     }
 
-    on<TEvent extends (keyof ProtocolEvents & keyof StreamEvents)> (
+    on<TEvent extends keyof ProtocolEvents> (
         event: TEvent,
         listener: ProtocolEvents[TEvent]
-    ):this {
-        return super.on(event as any, listener as any)
-    }
+    ):this;
 
-    emit<TEvent extends (keyof ProtocolEvents & keyof StreamEvents)> (
+    on<TEvent extends keyof DuplexEvents<any, any>> (
         event: TEvent,
-        ...rest: Parameters<ProtocolEvents[TEvent]>
-    ):boolean {
-        return super.emit(event as any, ...rest)
+        listener: DuplexEvents<any, any>[TEvent]
+    ):this;
+
+    on (event:string, listener:(...args: any[])=>void):this {
+        return super.on(event as any, listener)
     }
 
-    removeListener<TEvent extends (keyof StreamEvents & keyof ProtocolEvents)> (
+    emit<TEvent extends keyof DuplexEvents<any, any>> (
+        event: TEvent,
+        ...args: Parameters<DuplexEvents<any, any>[TEvent]>
+    ): boolean;
+
+    emit<TEvent extends keyof DuplexEvents<any, any>> (
+        event: TEvent,
+        ...args: Parameters<DuplexEvents<any, any>[TEvent]>
+    ): boolean;
+
+    emit<TEvent extends keyof ProtocolEvents> (
+        event: TEvent,
+        ...args: Parameters<ProtocolEvents[TEvent]>
+    ): boolean {
+        return super.emit(event as any, ...args)
+    }
+
+    removeListener<TEvent extends keyof StreamEvents> (
         event:TEvent,
-        listener
-    ):this {
-        return super.removeListener(event, listener)
+        listener:StreamEvents[TEvent]
+    ):this;
+
+    removeListener<TEvent extends keyof ProtocolEvents> (
+        event:TEvent,
+        listener:ProtocolEvents[TEvent]
+    ):this;
+
+    removeListener (event:string, listener:(...args:any[]) => void):this {
+        return super.removeListener(event as any, listener)
     }
 
     /**
