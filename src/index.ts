@@ -5,9 +5,7 @@ import RC4 from 'rc4'
 import {
     Duplex,
     type DuplexEvents,
-    // type DuplexEvents,
     type StreamEvents,
-    // type WritableEvents
 } from 'streamx'
 import {
     hash,
@@ -97,7 +95,7 @@ interface ProtocolEvents extends StreamEvents {
     'pe2': () => void;
     'pe3': () => void;
     'pe4': () => void;
-    'error': (err: Error) => void;
+    'error': (err?:Error) => void;
     'suggest': (index: number) => void;
     'piece': (index: number, offset: number, buffer: Buffer) => void;
     'cancel': (index: number, offset: number, length: number) => void;
@@ -114,184 +112,6 @@ interface ProtocolEvents extends StreamEvents {
     'pipe': () => void;
     'drain': () => void;
 }
-
-// interface ProtocolEvents {
-//     'bitfield': (bitfield: any) => void;
-//     'keep-alive': () => void;
-//     'choke': () => void;
-//     'unchoke': () => void;
-//     'interested': () => void;
-//     'uninterested': () => void;
-//     'timeout': () => void;
-//     'have-all': () => void;
-//     'have-none': () => void;
-//     'end': () => void;
-//     'close': () => void;
-//     'finish': () => void;
-//     'pe1': () => void;
-//     'pe2': () => void;
-//     'pe3': () => void;
-//     'pe4': () => void;
-//     'error': (err: Error) => void;
-//     'suggest': (index: number) => void;
-//     'piece': (index: number, offset: number, buffer: Buffer) => void;
-//     'cancel': (index: number, offset: number, length: number) => void;
-//     'extended': (ext: 'handshake' | string, buf: any) => void;
-//     'unknownmessage': (buffer: Buffer) => void;
-//     'handshake': (
-//         infoHash: string,
-//         peerId: string,
-//         extensions: { extended: boolean; fast: boolean }
-//     ) => void;
-//     // Add other events as needed
-// }
-
-// interface ProtocolEvents {
-//     'bitfield': (bitfield: any) => void;
-//     'keep-alive': () => void;
-//     'choke': () => void;
-//     'unchoke': () => void;
-//     'interested': () => void;
-//     'uninterested': () => void;
-//     'timeout': () => void;
-//     'have-all': () => void;
-//     'have-none': () => void;
-//     'end': () => void;
-//     'close': () => void;
-//     'finish': () => void;
-//     'pe1': () => void;
-//     'pe2': () => void;
-//     'pe3': () => void;
-//     'pe4': () => void;
-//     'error': (err: Error) => void;
-//     'suggest': (index: number) => void;
-//     'piece': (index: number, offset: number, buffer: Buffer) => void;
-//     'cancel': (index: number, offset: number, length: number) => void;
-//     'extended': (ext: 'handshake' | string, buf: any) => void;
-//     'unknownmessage': (buffer: Buffer) => void;
-//     'handshake': (
-//         infoHash: string,
-//         peerId: string,
-//         extensions: { extended: boolean; fast: boolean }
-//     ) => void;
-//     // Add other events as needed
-// }
-
-// interface ProtocolEvents {
-//     'bitfield': (bitfield: any) => void;
-//     'keep-alive': () => void;
-//     'choke': () => void;
-//     'unchoke': () => void;
-//     'interested': () => void;
-//     'uninterested': () => void;
-//     'timeout': () => void;
-//     'have-all': () => void;
-//     'have-none': () => void;
-//     'end': () => void;
-//     'close': () => void;
-//     'finish': () => void;
-//     'pe1': () => void;
-//     'pe2': () => void;
-//     'pe3': () => void;
-//     'pe4': () => void;
-//     'error': (err: Error) => void;
-//     'suggest': (index: number) => void;
-//     'piece': (index: number, offset: number, buffer: Buffer) => void;
-//     'cancel': (index: number, offset: number, length: number) => void;
-//     'extended': (ext: 'handshake' | string, buf: any) => void;
-//     'unknownmessage': (buffer: Buffer) => void;
-//     'handshake': (
-//         infoHash: string,
-//         peerId: string,
-//         extensions: { extended: boolean; fast: boolean }
-//     ) => void;
-//     // Add other events as needed
-// }
-
-// interface ProtocolEvents {
-//     'bitfield': (bitfield: any) => void;
-//     'keep-alive': () => void;
-//     'choke': () => void;
-//     'unchoke': () => void;
-//     'interested': () => void;
-//     'uninterested': () => void;
-//     'timeout': () => void;
-//     'have-all': () => void;
-//     'have-none': () => void;
-//     'end': () => void;
-//     'close': () => void;
-//     'finish': () => void;
-//     'pe1': () => void;
-//     'pe2': () => void;
-//     'pe3': () => void;
-//     'pe4': () => void;
-//     'error': (err: Error) => void;
-//     'suggest': (index: number) => void;
-//     'piece': (index: number, offset: number, buffer: Buffer) => void;
-//     'cancel': (index: number, offset: number, length: number) => void;
-//     'extended': (ext: 'handshake' | string, buf: any) => void;
-//     'unknownmessage': (buffer: Buffer) => void;
-//     'handshake': (
-//         infoHash: string,
-//         peerId: string,
-//         extensions: { extended: boolean; fast: boolean }
-//     ) => void;
-//     // Add other events as needed
-// }
-
-// export interface ProtocolEvents {
-//     'keep-alive': () => void;
-//     choke: () => void;
-//     unchoke: () => void;
-//     interested: () => void;
-//     uninterested: () => void;
-//     timeout: () => void;
-//     'have-all': () => void;
-//     'have-none': () => void;
-//     end: () => void;
-//     close: () => void;
-//     finish: () => void;
-//     pe1: () => void;
-//     pe2: () => void;
-//     pe3: () => void;
-//     pe4: () => void;
-//     error: (err: Error) => void;
-//     suggest: (index: number) => void;
-//     piece: (index: number, offset: number, buffer: Buffer) => void;
-//     cancel: (index: number, offset: number, length: number) => void;
-//     extended: (ext: 'handshake' | string, buf: any) => void;
-//     unknownmessage: (buffer: Buffer) => void;
-//     handshake: (
-//         infoHash: string,
-//         peerId: string,
-//         extensions: { extended: boolean; fast: boolean }
-//     ) => void;
-//     // Add other events as needed
-// }
-
-// export type ProtocolEvents = StreamEvents & DuplexEvents<any, any> & {
-// export type ProtocolEvents = StreamEvents & {
-//     'readable':()=>void;
-//     'upload':(data:any)=>void;
-//     'new-item':(item:string)=>void;
-//     'item-updated':(item:string, newValue:number)=>void;
-//     'finish':(item:any)=>void;
-//     'piping':(data:any)=>any;
-//     'unchoke':()=>any;
-//     'have-all':()=>void;
-//     'end':()=>void;
-//     'keep-alive':()=>void;
-//     suggest: (index: number) => void;
-//     piece: (index: number, offset: number, buffer: Buffer) => void;
-//     cancel: (index: number, offset: number, length: number) => void;
-//     extended: (ext: 'handshake' | string, buf: any) => void;
-//     unknownmessage: (buffer: Buffer) => void;
-//     handshake: (
-//         infoHash: string,
-//         peerId: string,
-//         extensions: { extended: boolean; fast: boolean }
-//     ) => void;
-// };
 
 export interface Ext {
     onHandshake?(
@@ -490,11 +310,8 @@ export class Wire extends Duplex<any> {
         return wire
     }
 
-    //  Argument of type '"end"' is not assignable to parameter of type
-    // '"keep-alive" | "choke" | "unchoke" | "interested" | "uninterested" |
-    // "timeout" | "have-all" | "have-none"'.
-
-    once<TEvent extends keyof StreamEvents | 'piping' | 'readable' | 'data' | 'end' | 'pipe' | 'finish' | 'drain'>(
+    once<TEvent extends keyof StreamEvents|'piping'|'readable'|'data'|'end'|
+        'pipe'|'finish'|'drain'|'keep-alive'>(
         event: TEvent,
         listener: TEvent extends keyof StreamEvents | 'piping' | 'readable' | 'data' | 'end' | 'pipe' | 'finish' | 'drain'
             ? DuplexEvents<any, any>[TEvent]
@@ -508,35 +325,24 @@ export class Wire extends Duplex<any> {
         return super.once(event as any, listener as any)
     }
 
-    on<TEvent extends keyof StreamEvents | 'piping' | 'readable' | 'data' | 'end' | 'pipe' | 'finish' | 'drain'> (
-        event: TEvent,
-        listener: TEvent extends keyof StreamEvents | 'piping' | 'readable' | 'data' | 'end' | 'pipe' | 'finish' | 'drain'
-            ? DuplexEvents<any, any>[TEvent]
-            : (...args: any[]) => void
-    ): this;
-
-    on<TEvent extends keyof ProtocolEvents> (
+    on<TEvent extends (keyof ProtocolEvents & keyof StreamEvents)> (
         event: TEvent,
         listener: ProtocolEvents[TEvent]
-    ): this {
+    ):this {
         return super.on(event as any, listener as any)
     }
 
-    emit<TEvent extends keyof StreamEvents | 'piping' | 'readable' | 'data' | 'end' | 'pipe' | 'finish' | 'drain'> (
-        event: TEvent,
-        ...rest: Parameters<TEvent extends keyof StreamEvents | 'piping' | 'readable' | 'data' | 'end' | 'pipe' | 'finish' | 'drain'
-            ? DuplexEvents<any, any>[TEvent]
-            : (...args: any[]) => void>
-    ): boolean;
-
-    emit<TEvent extends keyof ProtocolEvents> (
+    emit<TEvent extends (keyof ProtocolEvents & keyof StreamEvents)> (
         event: TEvent,
         ...rest: Parameters<ProtocolEvents[TEvent]>
-    ): boolean {
+    ):boolean {
         return super.emit(event as any, ...rest)
     }
 
-    removeListener<TEvent extends keyof StreamEvents|'piping'|'readable'|'data'|'end'|'pipe'|'finish'|'drain'> (event:TEvent, listener: TEvent extends keyof StreamEvents|'piping'|'readable'|'data'|'end'|'pipe'|'finish'|'drain' ? DuplexEvents<any, any>[TEvent]:(...args:any[])=>void):this {
+    removeListener<TEvent extends (keyof StreamEvents & keyof ProtocolEvents)> (
+        event:TEvent,
+        listener
+    ):this {
         return super.removeListener(event, listener)
     }
 
@@ -1089,7 +895,6 @@ export class Wire extends Duplex<any> {
     _onPe2 (pubKeyBuffer) {
         this._peerPubKey = arr2hex(pubKeyBuffer)
         this._sharedSecret = this._dh.computeSecret(this._peerPubKey, 'hex', 'hex')
-        // @ts-expect-error @TODO events
         this.emit('pe2')
     }
 
@@ -1128,7 +933,6 @@ export class Wire extends Duplex<any> {
         }
         this._cryptoHandshakeDone = true
         this._debug('crypto handshake done')
-        // @ts-expect-error @TDOD events + types
         this.emit('pe4')
     }
 
@@ -1149,7 +953,6 @@ export class Wire extends Duplex<any> {
             this.hasFast = true
         }
 
-        // @ts-expect-error ???
         this.emit('handshake', infoHash, peerId, extensions)
 
         for (const name in this._ext) {
@@ -1166,7 +969,6 @@ export class Wire extends Duplex<any> {
     _onChoke () {
         this.peerChoking = true
         this._debug('got choke')
-        // @ts-expect-error @TDOD events + types
         this.emit('choke')
         if (!this.hasFast) {
             // BEP6 Fast Extension: Choke no longer implicitly rejects all pending requests
@@ -1179,21 +981,18 @@ export class Wire extends Duplex<any> {
     _onUnchoke () {
         this.peerChoking = false
         this._debug('got unchoke')
-        // @ts-expect-error @TDOD events + types
         this.emit('unchoke')
     }
 
     _onInterested () {
         this.peerInterested = true
         this._debug('got interested')
-        // @ts-expect-error @TDOD events + types
         this.emit('interested')
     }
 
     _onUninterested () {
         this.peerInterested = false
         this._debug('got uninterested')
-        // @ts-expect-error @TDOD events + types
         this.emit('uninterested')
     }
 
@@ -1209,7 +1008,6 @@ export class Wire extends Duplex<any> {
     _onBitField (buffer) {
         this.peerPieces = new BitField(buffer)
         this._debug('got bitfield')
-        // @ts-expect-error @TDOD events + types
         this.emit('bitfield', this.peerPieces)
     }
 
@@ -1249,14 +1047,12 @@ export class Wire extends Duplex<any> {
         this.downloadSpeed(buffer.length)
         // @ts-expect-error @TDOD events + types
         this.emit('download', buffer.length)
-        // @ts-expect-error @TDOD events + types
         this.emit('piece', index, offset, buffer)
     }
 
     _onCancel (index, offset, length) {
         this._debug('got cancel index=%d offset=%d length=%d', index, offset, length)
         this._pull(this.peerRequests, index, offset, length)
-        // @ts-expect-error @TDOD events + types
         this.emit('cancel', index, offset, length)
     }
 
@@ -1274,7 +1070,6 @@ export class Wire extends Duplex<any> {
             return
         }
         this._debug('got suggest %d', index)
-        // @ts-expect-error @TDOD events + types
         this.emit('suggest', index)
     }
 
@@ -1287,7 +1082,6 @@ export class Wire extends Duplex<any> {
         }
         this._debug('got have-all')
         this.peerPieces = new HaveAllBitField()
-        // @ts-expect-error @TDOD events + types
         this.emit('have-all')
     }
 
@@ -1299,7 +1093,6 @@ export class Wire extends Duplex<any> {
             return
         }
         this._debug('got have-none')
-        // @ts-expect-error @TDOD events + types
         this.emit('have-none')
     }
 
@@ -1369,7 +1162,6 @@ export class Wire extends Duplex<any> {
                 }
             }
             this._debug('got extended handshake')
-            // @ts-expect-error @TDOD events + types
             this.emit('extended', 'handshake', this.peerExtendedHandshake)
         } else {
             if (this.extendedMapping[ext]) {
@@ -1388,7 +1180,6 @@ export class Wire extends Duplex<any> {
     _onTimeout () {
         this._debug('request timed out')
         this._callback(this.requests.shift(), new Error('request has timed out'), null)
-        // @ts-expect-error @TODO extend events
         this.emit('timeout')
     }
 
